@@ -193,7 +193,9 @@ async function signIn() {
   await loadPeople();
 }
 
+let peopleSeq = 0;
 async function loadPeople() {
+  const seq = ++peopleSeq; // ignore stale responses (e.g. the demo list arriving after you connected)
   const note = $("#peopleNote");
   const form = $("#peopleForm");
   note.textContent =
@@ -216,8 +218,10 @@ async function loadPeople() {
   }
   form.hidden = false;
   try {
-    renderPeople(await api(peoplePath(), { auth: true }));
+    const list = await api(peoplePath(), { auth: true });
+    if (seq === peopleSeq) renderPeople(list);
   } catch (e) {
+    if (seq !== peopleSeq) return;
     if (/sign in/i.test(e.message) && wallet) {
       localStorage.removeItem(sessKey(wallet.account));
       session = null;

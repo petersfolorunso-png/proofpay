@@ -1,0 +1,25 @@
+{
+  "name": "proofpay",
+  "version": "0.1.0",
+  "description": "ProofPay: AI-verified proof-of-work escrow for tUSD8 on QDay Aevum Testnet",
+  "scripts": {
+    "start": "node src/server.ts",
+    "demo": "DEMO_WALLETS=1 node src/server.ts",
+    "e2e": "./scripts/local-e2e.sh",
+    "test": "node --test test/*.test.ts",
+    "typecheck": "tsc -p ."
+  },
+  "license": "MIT",
+  "type": "module",
+  "dependencies": {
+    "viem": "^2.58.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "typescript": "^7.0.2"
+  },
+  "private": true,
+  "engines": {
+    "node": ">=22.18"
+  }
+}

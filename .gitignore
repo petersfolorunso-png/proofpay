@@ -1,0 +1,18 @@
+# secrets — never commit keys
+.env
+.env.*
+*.env
+!.env.example
+**/wallet.env
+*.key
+*.pem
+# deps / build
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/*/31337/
+contracts/lib/
+# runtime data
+app/data/
+*.log
+.DS_Store

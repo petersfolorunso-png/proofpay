@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ProofPay · get paid the moment you prove it</title>
+  <link rel="stylesheet" href="/style.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✅</text></svg>" />
+</head>
+<body>
+  <header>
+    <div class="brand"><span class="logo">✓</span> ProofPay <span class="tag">on QDay Aevum</span></div>
+    <div class="net" id="net">connecting…</div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <h1>Pay when the proof is public.</h1>
+      <p>Describe the job in plain words. Your tUSD8 is locked in escrow. The freelancer pastes a public link, an AI agent checks it against your brief, and pays out on-chain in seconds with a verifiable receipt.</p>
+    </section>
+
+    <section class="card" id="wallets">
+      <div class="row between">
+        <h2>Wallets</h2>
+        <div class="row gap">
+          <label class="switch" id="demoSwitchWrap" hidden><input type="checkbox" id="demoSwitch" checked /> demo wallets</label>
+          <button class="ghost" id="connectBtn">Connect wallet</button>
+        </div>
+      </div>
+      <div id="walletInfo" class="muted">Loading…</div>
+    </section>
+
+    <section class="card">
+      <h2>1 · Describe the job</h2>
+      <textarea id="jobText" rows="3" placeholder='Pay @ada 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow'></textarea>
+      <div class="row between">
+        <div class="examples" id="examples"></div>
+        <button id="draftBtn">Draft escrow</button>
+      </div>
+      <div id="draft"></div>
+    </section>
+
+    <section class="card">
+      <div class="row between"><h2>2 · Jobs</h2><button class="ghost small" id="refreshBtn">Refresh</button></div>
+      <div id="jobs" class="jobs"><p class="muted">No jobs yet.</p></div>
+    </section>
+
+    <section class="card" id="jobDetail" hidden></section>
+  </main>
+
+  <footer>
+    <span id="footerInfo"></span> · <a href="https://faucet.qday.info/en" target="_blank" rel="noopener">Faucet</a> · Testnet only, test tokens only.
+  </footer>
+  <div id="toast" class="toast" hidden></div>
+  <script type="module" src="/app.js"></script>
+</body>
+</html>

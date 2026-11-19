@@ -99,7 +99,7 @@ Docker: `docker build -t proofpay . && docker run -p 8787:8787 --env-file <secre
 | RPC | https://rpc-test.qday.info |
 | Explorer | https://explorer-test.qday.info |
 | tUSD8 | `0x456569838f1d43009A91ebA4263147Afd7233483` (6 decimals) |
-| ProofPayEscrow | see `deployments/aevum-testnet.json` |
+| ProofPayEscrow | [`0x7FE218568E7AE2f03B95ac9769f1D84fad498593`](https://explorer-test.qday.info/address/0x7FE218568E7AE2f03B95ac9769f1D84fad498593) (verified) |
 
 ### AI provider
 The provider is pluggable (`app/src/llm.ts`). It defaults to Google Gemini (`gemini-3.5-flash-lite`, set with `GEMINI_API_KEY`). With `LLM_PROVIDER=none` the agent runs **rules-only**: it auto-releases only when there are at least 2 concrete hard checks and all of them pass, and otherwise asks the client. The demo still works if the model is down.

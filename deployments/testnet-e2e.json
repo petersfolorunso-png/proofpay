@@ -1,0 +1,362 @@
+{
+  "chainId": 44005,
+  "explorer": "https://explorer-test.qday.info",
+  "escrow": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+  "startedAt": "2026-11-19T13:29:28.148Z",
+  "jobs": [
+    {
+      "path": "release",
+      "jobId": "1",
+      "brief": "Pay @ada 1 tUSD8 when she posts a tweet saying \"ProofPay is live\" with #Aevum by Friday",
+      "briefHash": "0xadeec1538c578e0a83a4dbc7646d4b1bcbc3ab45e3b0bc8bb815e50a1ce387f9",
+      "status": "Released",
+      "createSteps": [
+        {
+          "label": "Approve tUSD8",
+          "hash": "0xea05551fc63e77214fe4c4b1a81d409322b6befdb53d2c60cf8990e74cf53478",
+          "url": "https://explorer-test.qday.info/tx/0xea05551fc63e77214fe4c4b1a81d409322b6befdb53d2c60cf8990e74cf53478"
+        },
+        {
+          "label": "Lock tUSD8 in escrow",
+          "hash": "0xdc637ab37c1bfdb04aad7ad5c88e4f63560f0195971a59bdd0b301c0b654a4a0",
+          "url": "https://explorer-test.qday.info/tx/0xdc637ab37c1bfdb04aad7ad5c88e4f63560f0195971a59bdd0b301c0b654a4a0"
+        }
+      ],
+      "proofTx": "0x6f7726759bdc50d0e69bedc4fd6dddd35e526a0a0b4917d8107a806aab45b001",
+      "proofTxUrl": "https://explorer-test.qday.info/tx/0x6f7726759bdc50d0e69bedc4fd6dddd35e526a0a0b4917d8107a806aab45b001",
+      "createTx": "0xdc637ab37c1bfdb04aad7ad5c88e4f63560f0195971a59bdd0b301c0b654a4a0",
+      "createTxUrl": "https://explorer-test.qday.info/tx/0xdc637ab37c1bfdb04aad7ad5c88e4f63560f0195971a59bdd0b301c0b654a4a0",
+      "releaseTx": "0x92888e99af1e390e19c02bfe444edb80bd756a9231c1c4e8b3c2ab6099a60ab9",
+      "releaseTxUrl": "https://explorer-test.qday.info/tx/0x92888e99af1e390e19c02bfe444edb80bd756a9231c1c4e8b3c2ab6099a60ab9",
+      "verdictHash": "0xaf3540d3e2f382df2bc2b3676d699d70b1a67abf273e43920503cd92acd69147",
+      "receiptHash": "0xaf3540d3e2f382df2bc2b3676d699d70b1a67abf273e43920503cd92acd69147",
+      "decision": "release",
+      "reasoning": "All 7 deterministic checks passed (rules-only mode).",
+      "checks": [
+        {
+          "id": "fetched",
+          "label": "Proof link is public and readable",
+          "pass": true,
+          "hard": true
+        },
+        {
+          "id": "platform",
+          "label": "Proof is an X post",
+          "pass": true,
+          "hard": true,
+          "detail": "fixture"
+        },
+        {
+          "id": "author",
+          "label": "Posted by @ada",
+          "pass": true,
+          "hard": true,
+          "detail": "author is @ada"
+        },
+        {
+          "id": "include:ProofPay is live",
+          "label": "Contains \"ProofPay is live\"",
+          "pass": true,
+          "hard": true
+        },
+        {
+          "id": "include:#Aevum",
+          "label": "Contains \"#Aevum\"",
+          "pass": true,
+          "hard": true
+        },
+        {
+          "id": "fresh",
+          "label": "Posted after the job was created",
+          "pass": true,
+          "hard": true,
+          "detail": "posted 2026-11-19T13:29:36.000Z"
+        },
+        {
+          "id": "before-submit",
+          "label": "Posted before it was submitted",
+          "pass": true,
+          "hard": true
+        }
+      ],
+      "receipt": {
+        "body": {
+          "kind": "ProofPayVerdict",
+          "version": 1,
+          "chainId": 44005,
+          "escrow": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+          "token": "0x456569838f1d43009A91ebA4263147Afd7233483",
+          "jobId": "1",
+          "client": "0xDC71726c8368aA2004Cd5527470249039C30935f",
+          "payee": "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f",
+          "amount": "1",
+          "briefHash": "0xadeec1538c578e0a83a4dbc7646d4b1bcbc3ab45e3b0bc8bb815e50a1ce387f9",
+          "proofUrl": "fixture://good",
+          "proofHash": "0x4d23549f2da83c7d23c9c956985776c2cca6f97c1f1282a6fa07cce0753b91bf",
+          "proofContentHash": "0x24276fef70b4c391fa049bad1e0ba304f733ea838239c3d87164802df1171141",
+          "proofSnapshot": {
+            "author": "ada",
+            "createdAt": 1795094976,
+            "excerpt": "ProofPay is live on #Aevum — pay on proof, not on promises.",
+            "fetchedAt": 1795094986
+          },
+          "checks": [
+            {
+              "id": "fetched",
+              "label": "Proof link is public and readable",
+              "pass": true,
+              "hard": true
+            },
+            {
+              "id": "platform",
+              "label": "Proof is an X post",
+              "pass": true,
+              "hard": true,
+              "detail": "fixture"
+            },
+            {
+              "id": "author",
+              "label": "Posted by @ada",
+              "pass": true,
+              "hard": true,
+              "detail": "author is @ada"
+            },
+            {
+              "id": "include:ProofPay is live",
+              "label": "Contains \"ProofPay is live\"",
+              "pass": true,
+              "hard": true
+            },
+            {
+              "id": "include:#Aevum",
+              "label": "Contains \"#Aevum\"",
+              "pass": true,
+              "hard": true
+            },
+            {
+              "id": "fresh",
+              "label": "Posted after the job was created",
+              "pass": true,
+              "hard": true,
+              "detail": "posted 2026-11-19T13:29:36.000Z"
+            },
+            {
+              "id": "before-submit",
+              "label": "Posted before it was submitted",
+              "pass": true,
+              "hard": true
+            }
+          ],
+          "injectionFlags": [],
+          "decision": "release",
+          "reasoning": "All 7 deterministic checks passed (rules-only mode).",
+          "decidedAt": 1795094987
+        },
+        "receiptHash": "0xaf3540d3e2f382df2bc2b3676d699d70b1a67abf273e43920503cd92acd69147",
+        "action": "agentRelease",
+        "txHash": "0x92888e99af1e390e19c02bfe444edb80bd756a9231c1c4e8b3c2ab6099a60ab9",
+        "blockNumber": "3580237"
+      }
+    },
+    {
+      "path": "reject_refund",
+      "jobId": "2",
+      "brief": "Pay @ada 1 tUSD8 when she posts a tweet saying \"ProofPay is live\" with #Aevum by next week",
+      "briefHash": "0x5e047313f27c37250e6b9255d2f0bb6c30575414a9decab857b120df942a6f7f",
+      "status": "Refunded",
+      "createSteps": [
+        {
+          "label": "Approve tUSD8",
+          "hash": "0xe558ab686916dfbe27e304cc982fee6f37674285d0dc13622610da023498a91b",
+          "url": "https://explorer-test.qday.info/tx/0xe558ab686916dfbe27e304cc982fee6f37674285d0dc13622610da023498a91b"
+        },
+        {
+          "label": "Lock tUSD8 in escrow",
+          "hash": "0x845ce2d75c7e6cb1b3e536bebdd36986788a7d77d6b5826bf95e1836289fd57b",
+          "url": "https://explorer-test.qday.info/tx/0x845ce2d75c7e6cb1b3e536bebdd36986788a7d77d6b5826bf95e1836289fd57b"
+        }
+      ],
+      "proofTx": "0x865026adc2abacddf5a12e946a743df1a441f7800ec8863c95e0563abbe6720c",
+      "proofTxUrl": "https://explorer-test.qday.info/tx/0x865026adc2abacddf5a12e946a743df1a441f7800ec8863c95e0563abbe6720c",
+      "createTx": "0x845ce2d75c7e6cb1b3e536bebdd36986788a7d77d6b5826bf95e1836289fd57b",
+      "createTxUrl": "https://explorer-test.qday.info/tx/0x845ce2d75c7e6cb1b3e536bebdd36986788a7d77d6b5826bf95e1836289fd57b",
+      "rejectTx": "0x2a960748cf7e8e147e8eef7e9440989af3489fc9eb96cbfc701d4a53ab2ca07d",
+      "rejectTxUrl": "https://explorer-test.qday.info/tx/0x2a960748cf7e8e147e8eef7e9440989af3489fc9eb96cbfc701d4a53ab2ca07d",
+      "refundTx": "0xb23b8f4360f7c88f66dba3be6e0f30703a6399066ee63995511eba474a085d06",
+      "refundTxUrl": "https://explorer-test.qday.info/tx/0xb23b8f4360f7c88f66dba3be6e0f30703a6399066ee63995511eba474a085d06",
+      "verdictHash": "0x33be9a10e98e161207d68e9601fcf045a81e2e8344d620b88c68b678c26e0f11",
+      "receiptHash": "0x33be9a10e98e161207d68e9601fcf045a81e2e8344d620b88c68b678c26e0f11",
+      "decision": "reject",
+      "reasoning": "Rejected: Contains \"ProofPay is live\"; Contains \"#Aevum\".",
+      "checks": [
+        {
+          "id": "fetched",
+          "label": "Proof link is public and readable",
+          "pass": true,
+          "hard": true
+        },
+        {
+          "id": "platform",
+          "label": "Proof is an X post",
+          "pass": true,
+          "hard": true,
+          "detail": "fixture"
+        },
+        {
+          "id": "author",
+          "label": "Posted by @ada",
+          "pass": true,
+          "hard": true,
+          "detail": "author is @ada"
+        },
+        {
+          "id": "include:ProofPay is live",
+          "label": "Contains \"ProofPay is live\"",
+          "pass": false,
+          "hard": true
+        },
+        {
+          "id": "include:#Aevum",
+          "label": "Contains \"#Aevum\"",
+          "pass": false,
+          "hard": true
+        },
+        {
+          "id": "fresh",
+          "label": "Posted after the job was created",
+          "pass": true,
+          "hard": true,
+          "detail": "posted 2026-11-19T13:29:57.000Z"
+        },
+        {
+          "id": "before-submit",
+          "label": "Posted before it was submitted",
+          "pass": true,
+          "hard": true
+        }
+      ],
+      "receipt": {
+        "body": {
+          "kind": "ProofPayVerdict",
+          "version": 1,
+          "chainId": 44005,
+          "escrow": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+          "token": "0x456569838f1d43009A91ebA4263147Afd7233483",
+          "jobId": "2",
+          "client": "0xDC71726c8368aA2004Cd5527470249039C30935f",
+          "payee": "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f",
+          "amount": "1",
+          "briefHash": "0x5e047313f27c37250e6b9255d2f0bb6c30575414a9decab857b120df942a6f7f",
+          "proofUrl": "fixture://bad",
+          "proofHash": "0x09b7be3235d2e11bb4b6b00883b6ee2c9f2bbe8676bbf087ad3f6be5a5eaf202",
+          "proofContentHash": "0x958fc19bc6924a64afbd606f20418b209ec8a1666866a1e45ba6ef7bcc69ab56",
+          "proofSnapshot": {
+            "author": "ada",
+            "createdAt": 1795094997,
+            "excerpt": "Working on something cool, more soon.",
+            "fetchedAt": 1795095006
+          },
+          "checks": [
+            {
+              "id": "fetched",
+              "label": "Proof link is public and readable",
+              "pass": true,
+              "hard": true
+            },
+            {
+              "id": "platform",
+              "label": "Proof is an X post",
+              "pass": true,
+              "hard": true,
+              "detail": "fixture"
+            },
+            {
+              "id": "author",
+              "label": "Posted by @ada",
+              "pass": true,
+              "hard": true,
+              "detail": "author is @ada"
+            },
+            {
+              "id": "include:ProofPay is live",
+              "label": "Contains \"ProofPay is live\"",
+              "pass": false,
+              "hard": true
+            },
+            {
+              "id": "include:#Aevum",
+              "label": "Contains \"#Aevum\"",
+              "pass": false,
+              "hard": true
+            },
+            {
+              "id": "fresh",
+              "label": "Posted after the job was created",
+              "pass": true,
+              "hard": true,
+              "detail": "posted 2026-11-19T13:29:57.000Z"
+            },
+            {
+              "id": "before-submit",
+              "label": "Posted before it was submitted",
+              "pass": true,
+              "hard": true
+            }
+          ],
+          "injectionFlags": [],
+          "decision": "reject",
+          "reasoning": "Rejected: Contains \"ProofPay is live\"; Contains \"#Aevum\".",
+          "decidedAt": 1795095006
+        },
+        "receiptHash": "0x33be9a10e98e161207d68e9601fcf045a81e2e8344d620b88c68b678c26e0f11",
+        "action": "agentReject",
+        "txHash": "0x2a960748cf7e8e147e8eef7e9440989af3489fc9eb96cbfc701d4a53ab2ca07d",
+        "blockNumber": "3580256"
+      }
+    }
+  ],
+  "balances": {
+    "before": {
+      "client": {
+        "address": "0xDC71726c8368aA2004Cd5527470249039C30935f",
+        "tUSD8": "2.5",
+        "gas": "0.01"
+      },
+      "freelancer": {
+        "address": "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f",
+        "tUSD8": "0",
+        "gas": "0.01"
+      },
+      "escrow": {
+        "address": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+        "tUSD8": "0",
+        "gas": "0"
+      }
+    },
+    "after": {
+      "client": {
+        "address": "0xDC71726c8368aA2004Cd5527470249039C30935f",
+        "tUSD8": "1.5",
+        "gas": "0.009462524"
+      },
+      "freelancer": {
+        "address": "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f",
+        "tUSD8": "1",
+        "gas": "0.009890012"
+      },
+      "escrow": {
+        "address": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+        "tUSD8": "0",
+        "gas": "0"
+      }
+    }
+  },
+  "token": "0x456569838f1d43009A91ebA4263147Afd7233483",
+  "agent": "0x4dDc0aCCd3B03c84E90C239329296A1b30373F65",
+  "demo": {
+    "client": "0xDC71726c8368aA2004Cd5527470249039C30935f",
+    "freelancer": "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f"
+  },
+  "ok": true,
+  "finishedAt": "2026-11-19T13:30:17.277Z"
+}

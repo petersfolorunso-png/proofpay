@@ -1,0 +1,11 @@
+{
+  "chainId": 44005,
+  "escrow": "0x7FE218568E7AE2f03B95ac9769f1D84fad498593",
+  "deployTx": "0x5721750b66ec42e8a6b71d13be6dcb22937a91b1dab708be75d0d76d3dcaefb4",
+  "deployBlock": "3579998",
+  "token": "0x456569838f1d43009A91ebA4263147Afd7233483",
+  "owner": "0x7CA98811EC7C0BBA8a73262804C683BDE962e8b2",
+  "agent": "0x4dDc0aCCd3B03c84E90C239329296A1b30373F65",
+  "agentReleaseCap": "100000000",
+  "maxJobAmount": "1000000000"
+}

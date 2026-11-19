@@ -147,8 +147,11 @@ async function jobView(id: bigint) {
     proofUrl: rec.proofUrl,
     createTx: rec.createTx,
     proofTx: rec.proofTx,
-    agentState: rec.agentState ?? (j.status === "ProofSubmitted" ? "verifying" : "idle"),
-    agentNote: rec.agentNote,
+    // If the client settled the job while the agent was still checking, the agent's late tx simply
+    // reverts; that's not an error worth showing on a finished job.
+    ...(["Released", "Refunded"].includes(j.status) && rec.agentState === "error"
+      ? { agentState: "done", agentNote: "Settled on-chain before the agent's verdict landed (client approved or refunded)." }
+      : { agentState: rec.agentState ?? (j.status === "ProofSubmitted" ? "verifying" : "idle"), agentNote: rec.agentNote }),
     receipts: rec.receipts,
     lastActionTx: rec.lastActionTx,
   };
@@ -250,7 +253,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
       if (!isAddress(w, { strict: false })) throw new HttpError(400, "That isn't a wallet address.");
       const mine = await jobIndex.forWallet(w, 50);
       const jobs = await Promise.all(mine.map(async ({ id, role }) => ({ ...(await jobView(id).catch(() => null)), role })));
-      return json(res, 200, jobs.filter((j) => j.jobId));
+      return json(res, 200, jobs.filter((j) => "jobId" in j));
     }
     const { jobCount } = await readParams();
     const ids: bigint[] = [];

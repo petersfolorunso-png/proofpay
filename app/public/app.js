@@ -60,6 +60,7 @@ async function boot() {
     if (i !== undefined) $("#jobText").value = ex[i];
   };
   renderWallets();
+  loadPeople();
   loadJobs();
   const m = location.pathname.match(/^\/job\/(\d+)/);
   if (m) openJob(m[1]);
@@ -84,6 +85,62 @@ async function renderWallets() {
 }
 
 $("#demoSwitch").onchange = renderWallets;
+
+// ------------------------------------------------------------------ saved people
+async function loadPeople() {
+  try {
+    renderPeople(await api("/api/contacts"));
+  } catch (e) {
+    $("#peopleList").innerHTML = `<p class="muted">${esc(e.message)}</p>`;
+  }
+}
+function renderPeople(map) {
+  const entries = Object.entries(map ?? {});
+  if (!entries.length) {
+    $("#peopleList").innerHTML = `<p class="muted">No one saved yet. Add someone above, or paste a 0x address in the job box.</p>`;
+    return;
+  }
+  entries.sort((a, b) => {
+    const ba = a[1].builtin ? 1 : 0;
+    const bb = b[1].builtin ? 1 : 0;
+    if (ba !== bb) return ba - bb;
+    return a[0].localeCompare(b[0]);
+  });
+  $("#peopleList").innerHTML = entries
+    .map(([name, c]) => {
+      const handle = c.handle ? ` <span class="muted">X @${esc(c.handle)}</span>` : "";
+      const badge = c.builtin ? ` <span class="badge">demo</span>` : "";
+      const note = c.builtin ? `<div class="muted" style="font-size:12px">Built-in demo contact — can't be removed.</div>` : "";
+      const remove = c.builtin ? "" : `<button type="button" class="danger small" data-remove="${esc(name)}">Remove</button>`;
+      return `<div class="person"><div><div><b>@${esc(name)}</b>${handle}${badge}</div><div class="mono">${addrLink(c.address)}</div>${note}</div>${remove}</div>`;
+    })
+    .join("");
+}
+$("#peopleForm").onsubmit = (e) => {
+  e.preventDefault();
+  busy($("#savePersonBtn"), async () => {
+    const name = $("#personName").value.trim();
+    const address = $("#personWallet").value.trim();
+    const handle = $("#personHandle").value.trim();
+    await api("/api/contacts", { method: "POST", body: { name, address, handle: handle || undefined } });
+    toast(`Saved @${name.replace(/^@/, "").toLowerCase()}`);
+    $("#peopleForm").reset();
+    $("#personName").focus();
+    await loadPeople();
+  });
+};
+$("#peopleList").onclick = (e) => {
+  const btn = e.target.closest("[data-remove]");
+  if (!btn) return;
+  const name = btn.dataset.remove;
+  if (!confirm(`Remove @${name} from Saved people?`)) return;
+  busy(btn, async () => {
+    await api(`/api/contacts/${encodeURIComponent(name)}`, { method: "DELETE" });
+    toast(`Removed @${name}`);
+    await loadPeople();
+  });
+};
+
 $("#connectBtn").onclick = () =>
   busy($("#connectBtn"), async () => {
     if (!window.ethereum) throw new Error("No browser wallet found. Install MetaMask or Rabby, or use demo wallets.");

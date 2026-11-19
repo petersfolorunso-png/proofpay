@@ -1,6 +1,7 @@
 import { getAddress, isAddress } from "viem";
 import { hashJson } from "./canonical.ts";
 import type { LLMProvider } from "./llm.ts";
+import { unknownPayeeMessage } from "./contacts.ts";
 
 export type Platform = "x" | "github" | "web";
 
@@ -83,7 +84,7 @@ export function parseRules(text: string, contacts: Record<string, Contact>, now 
     payee = c.address;
     handle = c.handle ?? payeeHandle;
   }
-  if (!payee) throw new Error("Who should get paid? Add their 0x wallet address or a saved contact like @sarah.");
+  if (!payee) throw new Error(unknownPayeeMessage(payeeHandle));
 
   // Amount: "50 tUSD8", "50 usd", "$50", "50 dollars".
   const am =

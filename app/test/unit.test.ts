@@ -36,7 +36,7 @@ test("explicit address and $ amount; link requirement", () => {
 });
 
 test("missing payee / amount give friendly errors", () => {
-  assert.throws(() => parseRules("pay @nobody 50 tUSD8 for a tweet", {}, now), /Who should get paid/);
+  assert.throws(() => parseRules("pay @nobody 50 tUSD8 for a tweet", {}, now), /Save @nobody in Saved people first/);
   assert.throws(() => parseRules(`pay ${SARAH} for a tweet`, {}, now), /How much/);
 });
 

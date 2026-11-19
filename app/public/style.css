@@ -43,4 +43,12 @@ footer{text-align:center;color:var(--muted);font-size:12px;padding:20px}
 .switch{font-size:13px;color:var(--muted);display:flex;gap:6px;align-items:center}
 .balances{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}.bal{border:1px solid var(--line);border-radius:10px;padding:10px}
 .bal .big{font-size:20px}
-@media (max-width:600px){.kv{grid-template-columns:1fr}.job{grid-template-columns:40px 1fr auto}.job .amt{display:none}.hero h1{font-size:28px}}
+.people-lead{margin:0 0 12px}.people-note{margin:12px 0 0;font-size:12px}
+.people-form{display:grid;grid-template-columns:minmax(110px,.9fr) minmax(180px,1.6fr) minmax(110px,.9fr) auto;gap:8px 10px;align-items:end;margin-bottom:4px}
+.people-form label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted);margin:0}
+.people-form button{margin:0;min-height:44px}
+.people-list{display:grid;gap:8px;margin-top:12px}
+.person{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.person > div{min-width:0}
+.badge{font-size:11px;border:1px solid var(--line);padding:1px 8px;border-radius:99px;color:var(--muted);font-weight:600;margin-left:4px}
+@media (max-width:600px){.kv{grid-template-columns:1fr}.job{grid-template-columns:40px 1fr auto}.job .amt{display:none}.hero h1{font-size:28px}.people-form{grid-template-columns:1fr}.people-form button{width:100%}}

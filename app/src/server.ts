@@ -1,11 +1,12 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
-import { readFileSync, existsSync, writeFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import { join, extname, normalize, resolve } from "node:path";
 import { formatUnits, parseUnits, isAddress, getAddress, keccak256, toBytes } from "viem";
 import { config, txUrl, addrUrl, type Hex } from "./config.ts";
 import { erc20Abi, escrowAbi } from "./abi.ts";
 import { Signer, escrowAddress, readJob, readParams, publicClient, errMsg } from "./chain.ts";
-import { parseBrief, type Brief, type Contact } from "./brief.ts";
+import { parseBrief, type Brief } from "./brief.ts";
+import { ContactBook, ContactError } from "./contacts.ts";
 import { hashJson } from "./canonical.ts";
 import { makeProvider } from "./llm.ts";
 import { Store } from "./store.ts";
@@ -19,15 +20,20 @@ const agent = new VerifierAgent(store, llm, agentSigner);
 const demoClient = config.demoWallets && config.demoClientKey ? new Signer(config.demoClientKey) : null;
 const demoFreelancer = config.demoWallets && config.demoFreelancerKey ? new Signer(config.demoFreelancerKey) : null;
 
-const contactsFile = join(config.dataDir, "contacts.json");
-function contacts(): Record<string, Contact> {
-  const c: Record<string, Contact> = existsSync(contactsFile) ? JSON.parse(readFileSync(contactsFile, "utf8")) : {};
-  if (demoFreelancer) {
-    const handle = process.env.DEMO_FREELANCER_X ?? "sarah";
-    if (!c["sarah"]) c["sarah"] = { address: demoFreelancer.address, handle };
-    if (!c["ada"]) c["ada"] = { address: demoFreelancer.address, handle }; // alias for older example jobs
+const book = new ContactBook(config.dataDir);
+function demoContact() {
+  return demoFreelancer ? { address: demoFreelancer.address, handle: process.env.DEMO_FREELANCER_X ?? "sarah" } : null;
+}
+function contacts() {
+  return book.list(demoContact());
+}
+function contactAction<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (e) {
+    if (e instanceof ContactError) throw new HttpError(e.status, e.message);
+    throw e;
   }
-  return c;
 }
 
 class HttpError extends Error {
@@ -138,12 +144,19 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
   if (path === "/api/contacts" && m === "GET") return json(res, 200, contacts());
   if (path === "/api/contacts" && m === "POST") {
     const b = await body(req);
-    const name = String(b.name ?? "").replace(/^@/, "").toLowerCase();
-    if (!/^[a-z0-9_]{1,30}$/.test(name) || !isAddress(String(b.address))) throw new HttpError(400, "Need a name and a valid 0x address");
-    const c = existsSync(contactsFile) ? JSON.parse(readFileSync(contactsFile, "utf8")) : {};
-    c[name] = { address: getAddress(b.address), handle: b.handle ? String(b.handle).replace(/^@/, "").slice(0, 30) : name };
-    writeFileSync(contactsFile, JSON.stringify(c, null, 2));
-    return json(res, 200, c[name]);
+    const saved = contactAction(() => book.upsert(b, !!demoFreelancer));
+    return json(res, 200, saved);
+  }
+  const del = path.match(/^\/api\/contacts\/([^/]+)$/);
+  if (del && m === "DELETE") {
+    let raw = del[1];
+    try {
+      raw = decodeURIComponent(del[1]);
+    } catch {
+      throw new HttpError(400, "Use a name like deestar (letters, numbers or _, up to 30 characters).");
+    }
+    contactAction(() => book.remove(raw, !!demoFreelancer));
+    return json(res, 200, { ok: true });
   }
 
   if (path === "/api/parse" && m === "POST") {

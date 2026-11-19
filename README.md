@@ -41,7 +41,7 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 | Deploy | `scripts/deploy-aevum.sh` | forge create + Blockscout verification |
 
 ### Core flows
-1. **Create:** the client describes the job. The parser extracts payee (0x address or saved contact), amount, deadline and proof requirements (quoted phrases, #hashtags, @mentions, links). The client sees a confirm card and signs `approve` + `createAndFund`.
+1. **Create:** the client describes the job. The parser extracts payee (0x address, or a name from the Saved people box), amount, deadline and proof requirements (quoted phrases, #hashtags, @mentions, links). The client sees a confirm card and signs `approve` + `createAndFund`.
 2. **Deliver:** the payee submits a public URL with `submitProof`. The URL hash is stored on-chain.
 3. **Verify:** the agent watches `ProofSubmitted` events (chunked `eth_getLogs` under the RPC's 1,000-block limit), fetches the proof, runs the checks, and calls `agentRelease` or `agentReject`. The verdict is bound to the exact `proofHash` it reviewed.
 4. **Receipt:** a canonical JSON receipt holds the brief hash, proof snapshot, every check, the AI verdict, reasoning and decision. `keccak256(receipt)` is the on-chain `verdictHash`. You can download it from the UI and anyone can re-hash it.
@@ -62,7 +62,7 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 | Fake tokens | Fee-on-transfer tokens are rejected (balance-delta check). Only the official tUSD8 address is configured. |
 | Key hygiene | Keys live outside the repo (`~/.secrets/aevum/wallet.env`, chmod 600). The server loads only the agent/demo keys and never the owner key. `.gitignore` blocks env and key files. Testnet only. |
 
-Known limitations (MVP): the JSON file store is a cache (the chain is the source of truth). DNS-rebinding between the check and the fetch is not fully closed. X verification uses X's public syndication endpoint, so protected or deleted posts can't be verified. A malicious client can refund right after a rejection; the payee's protection is the 3-strike rule plus the receipt trail.
+Known limitations (MVP): the JSON file store is a cache (the chain is the source of truth). Saved people also live in a local JSON file and may reset when a free host restarts. DNS-rebinding between the check and the fetch is not fully closed. X verification uses X's public syndication endpoint, so protected or deleted posts can't be verified. A malicious client can refund right after a rejection; the payee's protection is the 3-strike rule plus the receipt trail.
 
 ## Run it
 
@@ -76,7 +76,7 @@ forge test -vv
 
 # app
 cd ../app && npm ci
-npm test                      # 13 unit tests (parser, rules, injection, policy, SSRF, receipts)
+npm test                      # unit tests (parser, contacts, rules, injection, policy, SSRF, receipts)
 ./scripts/local-e2e.sh        # full on-chain flow on anvil: release / reject+refund / impostor / injection / over-cap
 KEEP=1 ./scripts/local-e2e.sh # same, then leaves a local demo running on http://127.0.0.1:8799
 ```

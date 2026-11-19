@@ -30,6 +30,25 @@
       <div id="walletInfo" class="muted">Loading…</div>
     </section>
 
+    <section class="card" id="people">
+      <h2>Saved people</h2>
+      <p class="muted people-lead">Save a name, their 0x wallet and (optionally) their X handle. After that, “pay @name …” in the job box will find them.</p>
+      <form id="peopleForm" class="people-form" autocomplete="off">
+        <label>Name
+          <input id="personName" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="31" placeholder="deestar" required />
+        </label>
+        <label>Wallet
+          <input id="personWallet" class="mono" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="64" placeholder="0x…" required />
+        </label>
+        <label>X handle <span class="muted">(optional)</span>
+          <input id="personHandle" type="text" inputmode="text" autocapitalize="none" autocorrect="off" spellcheck="false" maxlength="31" placeholder="same as name" />
+        </label>
+        <button type="submit" id="savePersonBtn">Save</button>
+      </form>
+      <div id="peopleList" class="people-list"><p class="muted">Loading…</p></div>
+      <p class="muted people-note">Saved people live on this server and may reset when the free demo restarts. On-chain jobs are not affected.</p>
+    </section>
+
     <section class="card">
       <h2>1 · Describe the job</h2>
       <textarea id="jobText" rows="3" placeholder='Pay @sarah 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow'></textarea>

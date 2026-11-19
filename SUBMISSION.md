@@ -64,15 +64,17 @@ Full hashes and receipts: `deployments/testnet-e2e.json`.
 **Not uploaded yet.** File ready at `/workspace/hackathons/aevum/demo/proofpay-demo.mp4` (82.6 seconds, 1280×720). Upload to YouTube as unlisted (or another login-free host) and paste the link.
 
 ### Live demo / website
-**Not hosted yet.** Judges can also run the packaged Docker image (satisfies the official “live deployment” rule):
+**Live (Render free plan, Frankfurt):** https://proofpay-hleb.onrender.com
+
+Demo wallets are on. The first load after ~15 minutes idle can take about a minute (free-plan spin-down). Job/brief state is a local JSON file, so it resets when the service restarts or spins down; on-chain jobs stay on Aevum. MTN and Airtel in Nigeria often block `onrender.com` — wifi, Glo, or the 1.1.1.1 app usually work.
+
+Judges can also run the packaged Docker image:
 
 ```bash
 docker build -t proofpay .
 docker run -p 8787:8787 --env-file <secrets-file> -e DEMO_WALLETS=1 proofpay
 # open http://localhost:8787
 ```
-
-Optional later: a free Render web service (workspace “Mari Space”) with `DEMO_WALLETS=1` and the agent/demo keys. Do not deploy until Mari says so. No new paid account and no card charge.
 
 ### Social links
 Add the X launch post after it is published, and tag @terminal3io only if that is still desired for the other grant. For this challenge, official channels are QDay / Aevum (Discord: https://discord.gg/bYPhjmrSfK).

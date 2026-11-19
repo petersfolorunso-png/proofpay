@@ -78,8 +78,8 @@ try {
   report.balances.before = before;
   console.log("balances before", JSON.stringify(before, null, 2));
 
-  const BRIEF_OK = 'Pay @ada 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday';
-  const BRIEF_BAD = 'Pay @ada 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by next week';
+  const BRIEF_OK = 'Pay @sarah 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday';
+  const BRIEF_BAD = 'Pay @sarah 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by next week';
 
   // ----- release path -----
   console.log("\n=== RELEASE PATH ===");
@@ -94,7 +94,7 @@ try {
   // Use wall clock after create: posted "now", will submit in a couple seconds
   const postedAt = Math.floor(Date.now() / 1000) - 2;
   writeFixture("good", {
-    author: parsed.brief.proof.authorHandle || "ada",
+    author: parsed.brief.proof.authorHandle || "sarah",
     createdAt: postedAt,
     text: 'ProofPay is live on #Aevum — pay on proof, not on promises.',
   });
@@ -136,7 +136,7 @@ try {
   console.log("created job", id2, created2.steps);
   await waitFor(id2, (j) => j.status === "Funded", 60_000, "funded");
   writeFixture("bad", {
-    author: parsed2.brief.proof.authorHandle || "ada",
+    author: parsed2.brief.proof.authorHandle || "sarah",
     createdAt: Math.floor(Date.now() / 1000) - 2,
     text: "Working on something cool, more soon.",
   });

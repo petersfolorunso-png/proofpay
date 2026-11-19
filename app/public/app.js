@@ -50,9 +50,9 @@ async function boot() {
     : "Escrow not deployed yet";
   if (CFG.demo) $("#demoSwitchWrap").hidden = false;
   const ex = [
-    `Pay @ada 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow`,
+    `Pay @sarah 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow`,
     `Pay 0x… 20 tUSD8 for a blog post that links qday.io within 3 days`,
-    `Pay @ada $3 for a GitHub PR to proofpay with "fix" in the title by friday`,
+    `Pay @sarah $3 for a GitHub PR to proofpay with "fix" in the title by friday`,
   ];
   $("#examples").innerHTML = ex.map((e, i) => `<button class="chip" data-i="${i}">Example ${i + 1}</button>`).join("");
   $("#examples").onclick = (e) => {
@@ -74,7 +74,7 @@ async function renderWallets() {
     try {
       const b = await api("/api/demo/balances");
       const card = (t, x, sub) => `<div class="bal"><div class="muted">${t}</div><div class="big">${Number(x.tUSD8).toLocaleString()} tUSD8</div><div class="mono">${addrLink(x.address)} · ${Number(x.gas).toFixed(4)} tQDAY</div><div class="muted" style="font-size:12px">${sub}</div></div>`;
-      $("#walletInfo").innerHTML = `<div class="balances">${card("Client (demo)", b.client, "locks funds")}${card("Freelancer (demo)", b.freelancer, "@ada · gets paid")}${card("Escrow contract", b.escrow, "held until proof")}</div>`;
+      $("#walletInfo").innerHTML = `<div class="balances">${card("Client (demo)", b.client, "locks funds")}${card("Freelancer (demo)", b.freelancer, "@sarah · gets paid")}${card("Escrow contract", b.escrow, "held until proof")}</div>`;
     } catch (e) {
       $("#walletInfo").textContent = "Demo wallets: " + e.message;
     }

@@ -23,7 +23,7 @@ const create = async (text: string) => {
   const c = await call("/api/demo/create", { briefHash: p.briefHash });
   return c.jobId as string;
 };
-const BRIEF = 'Pay @ada 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow';
+const BRIEF = 'Pay @sarah 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow';
 
 test("happy path: proof accepted -> agent pays freelancer on-chain", async () => {
   const before = await call("/api/demo/balances");

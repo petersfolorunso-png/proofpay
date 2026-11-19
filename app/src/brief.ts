@@ -83,7 +83,7 @@ export function parseRules(text: string, contacts: Record<string, Contact>, now 
     payee = c.address;
     handle = c.handle ?? payeeHandle;
   }
-  if (!payee) throw new Error("Who should get paid? Add their 0x wallet address or a saved contact like @ada.");
+  if (!payee) throw new Error("Who should get paid? Add their 0x wallet address or a saved contact like @sarah.");
 
   // Amount: "50 tUSD8", "50 usd", "$50", "50 dollars".
   const am =

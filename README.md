@@ -2,8 +2,8 @@
 
 **Aevum Builder Challenge #1, Native AI Assistants track.** An AI-verified, proof-of-work escrow for **tUSD8** on **QDay Aevum Testnet** (chain 44005).
 
-> A client types: *"Pay @ada 50 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday."*
-> ProofPay turns that into an escrow, locks the tUSD8 on-chain, and waits. Ada pastes her tweet link. An AI agent fetches the post, checks it against the brief, and **pays her on-chain in seconds**, or rejects it with reasons. Every verdict comes with a receipt whose hash is stored on-chain.
+> A client types: *"Pay @sarah 50 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday."*
+> ProofPay turns that into an escrow, locks the tUSD8 on-chain, and waits. Sarah pastes her tweet link. An AI agent fetches the post, checks it against the brief, and **pays her on-chain in seconds**, or rejects it with reasons. Every verdict comes with a receipt whose hash is stored on-chain.
 
 ## The problem
 
@@ -13,7 +13,7 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 
 ```
  Client (plain language)                       Freelancer
-        │ "Pay @ada 50 tUSD8 when …"                │
+        │ "Pay @sarah 50 tUSD8 when …"                │
         ▼                                           │
  ┌──────────────┐  brief JSON + hash                │
  │ Brief parser │  (payee/amount from text only)    │
@@ -100,6 +100,20 @@ Docker: `docker build -t proofpay . && docker run -p 8787:8787 --env-file <secre
 | Explorer | https://explorer-test.qday.info |
 | tUSD8 | `0x456569838f1d43009A91ebA4263147Afd7233483` (6 decimals) |
 | ProofPayEscrow | [`0x7FE218568E7AE2f03B95ac9769f1D84fad498593`](https://explorer-test.qday.info/address/0x7FE218568E7AE2f03B95ac9769f1D84fad498593) (verified) |
+
+### Testnet evidence (real tUSD8 on Aevum)
+The escrow is verified on the explorer. A 1 tUSD8 happy path and a reject+refund path already ran on-chain. Full receipts: `deployments/testnet-e2e.json`.
+
+| Step | Explorer |
+|---|---|
+| Deploy ProofPayEscrow | [tx](https://explorer-test.qday.info/tx/0x5721750b66ec42e8a6b71d13be6dcb22937a91b1dab708be75d0d76d3dcaefb4) |
+| Job 1 — lock 1 tUSD8 | [tx](https://explorer-test.qday.info/tx/0xdc637ab37c1bfdb04aad7ad5c88e4f63560f0195971a59bdd0b301c0b654a4a0) |
+| Job 1 — submit proof | [tx](https://explorer-test.qday.info/tx/0x6f7726759bdc50d0e69bedc4fd6dddd35e526a0a0b4917d8107a806aab45b001) |
+| Job 1 — agent release (paid) | [tx](https://explorer-test.qday.info/tx/0x92888e99af1e390e19c02bfe444edb80bd756a9231c1c4e8b3c2ab6099a60ab9) |
+| Job 2 — lock 1 tUSD8 | [tx](https://explorer-test.qday.info/tx/0x845ce2d75c7e6cb1b3e536bebdd36986788a7d77d6b5826bf95e1836289fd57b) |
+| Job 2 — submit bad proof | [tx](https://explorer-test.qday.info/tx/0x865026adc2abacddf5a12e946a743df1a441f7800ec8863c95e0563abbe6720c) |
+| Job 2 — agent reject | [tx](https://explorer-test.qday.info/tx/0x2a960748cf7e8e147e8eef7e9440989af3489fc9eb96cbfc701d4a53ab2ca07d) |
+| Job 2 — refund to client | [tx](https://explorer-test.qday.info/tx/0xb23b8f4360f7c88f66dba3be6e0f30703a6399066ee63995511eba474a085d06) |
 
 ### AI provider
 The provider is pluggable (`app/src/llm.ts`). It defaults to Google Gemini (`gemini-3.5-flash-lite`, set with `GEMINI_API_KEY`). With `LLM_PROVIDER=none` the agent runs **rules-only**: it auto-releases only when there are at least 2 concrete hard checks and all of them pass, and otherwise asks the client. The demo still works if the model is down.

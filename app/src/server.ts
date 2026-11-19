@@ -22,7 +22,11 @@ const demoFreelancer = config.demoWallets && config.demoFreelancerKey ? new Sign
 const contactsFile = join(config.dataDir, "contacts.json");
 function contacts(): Record<string, Contact> {
   const c: Record<string, Contact> = existsSync(contactsFile) ? JSON.parse(readFileSync(contactsFile, "utf8")) : {};
-  if (demoFreelancer && !c["ada"]) c["ada"] = { address: demoFreelancer.address, handle: process.env.DEMO_FREELANCER_X ?? "ada" };
+  if (demoFreelancer) {
+    const handle = process.env.DEMO_FREELANCER_X ?? "sarah";
+    if (!c["sarah"]) c["sarah"] = { address: demoFreelancer.address, handle };
+    if (!c["ada"]) c["ada"] = { address: demoFreelancer.address, handle }; // alias for older example jobs
+  }
   return c;
 }
 

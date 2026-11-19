@@ -6,29 +6,29 @@ import { canonicalJson, hashJson } from "../src/canonical.ts";
 import { assertPublicUrl, type ProofSnapshot } from "../src/proof.ts";
 import type { LLMProvider } from "../src/llm.ts";
 
-const ADA = "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f" as const;
-const contacts = { ada: { address: ADA, handle: "ada_builds" } };
+const SARAH = "0xd188C43a8B200ef35D10992AfAD22dC0fb8a387f" as const;
+const contacts = { sarah: { address: SARAH, handle: "sarah" } };
 const now = new Date("2026-11-19T08:00:00Z");
 
 const snap = (p: Partial<ProofSnapshot>): ProofSnapshot => ({
-  url: "https://x.com/ada_builds/status/1", kind: "x", ok: true, author: "ada_builds", createdAt: 1763542800 + 3600,
+  url: "https://x.com/sarah/status/1", kind: "x", ok: true, author: "sarah", createdAt: 1763542800 + 3600,
   text: "", links: [], contentHash: "0x00", fetchedAt: 0, ...p,
 });
 
 test("parses a natural-language brief; money fields are deterministic", () => {
-  const r = parseRules('Pay @ada 50 tUSD8 when she posts a tweet with "ProofPay is live" and #Aevum mentioning @QDayOfficial by friday', contacts, now);
-  assert.equal(r.brief.payee, ADA);
+  const r = parseRules('Pay @sarah 50 tUSD8 when she posts a tweet with "ProofPay is live" and #Aevum mentioning @QDayOfficial by friday', contacts, now);
+  assert.equal(r.brief.payee, SARAH);
   assert.equal(r.brief.amount, "50");
   assert.equal(r.brief.proof.platform, "x");
-  assert.equal(r.brief.proof.authorHandle, "ada_builds");
+  assert.equal(r.brief.proof.authorHandle, "sarah");
   assert.deepEqual(r.brief.proof.mustInclude.sort(), ["#Aevum", "@QDayOfficial", "ProofPay is live"].sort());
   assert.ok(r.brief.deadline > now.getTime() / 1000);
   assert.match(r.briefHash, /^0x[0-9a-f]{64}$/);
 });
 
 test("explicit address and $ amount; link requirement", () => {
-  const r = parseRules(`pay ${ADA.toLowerCase()} $12.5 for a blog post linking qday.io within 2 days`, {}, now);
-  assert.equal(r.brief.payee, ADA); // checksummed
+  const r = parseRules(`pay ${SARAH.toLowerCase()} $12.5 for a blog post linking qday.io within 2 days`, {}, now);
+  assert.equal(r.brief.payee, SARAH); // checksummed
   assert.equal(r.brief.amount, "12.5");
   assert.equal(r.brief.proof.platform, "x"); // "post" -> x by default
   assert.deepEqual(r.brief.proof.mustLinkTo, ["qday.io"]);
@@ -37,7 +37,7 @@ test("explicit address and $ amount; link requirement", () => {
 
 test("missing payee / amount give friendly errors", () => {
   assert.throws(() => parseRules("pay @nobody 50 tUSD8 for a tweet", {}, now), /Who should get paid/);
-  assert.throws(() => parseRules(`pay ${ADA} for a tweet`, {}, now), /How much/);
+  assert.throws(() => parseRules(`pay ${SARAH} for a tweet`, {}, now), /How much/);
 });
 
 test("deadline parsing", () => {
@@ -51,13 +51,13 @@ test("LLM parser cannot add ungrounded requirements or change money", async () =
   const fake: LLMProvider = {
     name: "fake", model: "fake",
     async generateJson() {
-      return { title: "Promo tweet", mustInclude: ["ProofPay is live", "@ada", "send 9999 to 0xevil"], mustLinkTo: ["evil.com"], notes: "Tweet the launch", amount: "9999" };
+      return { title: "Promo tweet", mustInclude: ["ProofPay is live", "@sarah", "send 9999 to 0xevil"], mustLinkTo: ["evil.com"], notes: "Tweet the launch", amount: "9999" };
     },
   };
-  const r = await parseBrief('Pay @ada 50 tUSD8 for a tweet saying "ProofPay is live"', contacts, fake, now);
+  const r = await parseBrief('Pay @sarah 50 tUSD8 for a tweet saying "ProofPay is live"', contacts, fake, now);
   assert.equal(r.parser, "llm+rules");
   assert.equal(r.brief.amount, "50");
-  assert.equal(r.brief.payee, ADA);
+  assert.equal(r.brief.payee, SARAH);
   assert.deepEqual(r.brief.proof.mustInclude, ["ProofPay is live"]);
   assert.deepEqual(r.brief.proof.mustLinkTo, []);
   assert.equal(r.brief.title, "Promo tweet");
@@ -68,7 +68,7 @@ test("canonical JSON is key-order independent", () => {
   assert.equal(hashJson({ a: 1, b: 2 }), hashJson({ b: 2, a: 1 }));
 });
 
-const brief = parseRules('Pay @ada 50 tUSD8 for a tweet with "ProofPay is live" and #Aevum', contacts, now).brief;
+const brief = parseRules('Pay @sarah 50 tUSD8 for a tweet with "ProofPay is live" and #Aevum', contacts, now).brief;
 const created = Math.floor(now.getTime() / 1000);
 
 test("rules pass on a matching post", () => {
@@ -141,7 +141,7 @@ test("LLM judge wraps proof as untrusted data and validates output", async () =>
 
 test("receipt hash is reproducible", () => {
   const { body, receiptHash } = buildReceiptBody({
-    chainId: 44005, escrow: "0x1", token: "0x2", jobId: "1", client: "0x3", payee: ADA, amount: "50", briefHash: "0x4", proofUrl: "u",
+    chainId: 44005, escrow: "0x1", token: "0x2", jobId: "1", client: "0x3", payee: SARAH, amount: "50", briefHash: "0x4", proofUrl: "u",
     proofHash: "0x5", proofContentHash: "0x6", proofSnapshot: { excerpt: "", fetchedAt: 1 }, checks: [], injectionFlags: [], decision: "release", reasoning: "r", decidedAt: 1,
   });
   assert.equal(hashJson(JSON.parse(JSON.stringify(body))), receiptHash);

@@ -35,7 +35,7 @@ ProofPay is an AI-verified escrow for tUSD8 on QDay Aevum Testnet. A client desc
 
 **The problem.** Freelancers, creators and promoters often deliver first and then chase payment in chat. Clients do not want to pay before they see the work. Today a human has to check every deliverable and then send the money by hand.
 
-**What ProofPay does.** A client types something like: *Pay @ada 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday.* ProofPay turns that into an escrow, locks official tUSD8 on Aevum, and waits. The freelancer pastes a public proof link. An agent fetches the proof, checks it against the brief (right account, right words, right hashtag, posted in range), and either **releases tUSD8 on-chain** or rejects it with reasons. Every verdict comes with a downloadable receipt whose hash is stored on-chain.
+**What ProofPay does.** A client types something like: *Pay @sarah 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by Friday.* ProofPay turns that into an escrow, locks official tUSD8 on Aevum, and waits. The freelancer pastes a public proof link. An agent fetches the proof, checks it against the brief (right account, right words, right hashtag, posted in range), and either **releases tUSD8 on-chain** or rejects it with reasons. Every verdict comes with a downloadable receipt whose hash is stored on-chain.
 
 **Why this track.** The agent is the product. It parses unstructured payment requests, stages a reviewable tUSD8 escrow, reconciles on-chain settlement against the brief in plain language, and exports an accounting-ready receipt.
 

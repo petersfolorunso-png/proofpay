@@ -1,0 +1,9 @@
+CREATE TABLE IF NOT EXISTS docs (k TEXT PRIMARY KEY, v TEXT NOT NULL, updated_at INTEGER NOT NULL);
+CREATE TABLE IF NOT EXISTS contacts (
+  owner TEXT NOT NULL,
+  name TEXT NOT NULL,
+  address TEXT NOT NULL,
+  handle TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (owner, name)
+);

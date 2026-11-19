@@ -38,6 +38,7 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 | Contract tests | `contracts/test/` | 34 Foundry tests (unit, fuzz, reentrancy, fee-token) |
 | Agent + API | `app/src/` | Node 24 (native TypeScript), viem |
 | Web UI | `app/public/` | Plain HTML/JS, no build step; browser wallet via viem |
+| Durable store | `store-worker/` | Cloudflare Worker + D1 (free tier): saved people per wallet, briefs, job records |
 | Deploy | `scripts/deploy-aevum.sh` | forge create + Blockscout verification |
 
 ### Core flows
@@ -46,6 +47,19 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 3. **Verify:** the agent watches `ProofSubmitted` events (chunked `eth_getLogs` under the RPC's 1,000-block limit), fetches the proof, runs the checks, and calls `agentRelease` or `agentReject`. The verdict is bound to the exact `proofHash` it reviewed.
 4. **Receipt:** a canonical JSON receipt holds the brief hash, proof snapshot, every check, the AI verdict, reasoning and decision. `keccak256(receipt)` is the on-chain `verdictHash`. You can download it from the UI and anyone can re-hash it.
 5. **Fallbacks:** the client can **approve manually** at any time (human override). They can **refund** after the deadline, or right after a rejected proof. After 3 rejections the escrow refunds automatically.
+
+## Two ways to use it: your wallet, or demo mode
+
+**Your own wallet (the real product, still testnet money).** Tap **Connect wallet** in MetaMask, Rabby or any injected wallet, including the in-app browser of MetaMask / Trust / OKX on a phone (the page offers "Open in MetaMask" and "Open in Trust Wallet" buttons on mobile). ProofPay adds and switches to Aevum Testnet (chain 44005) for you.
+- **Client:** describe the job, then your wallet signs `approve` + `createAndFund`, so the tUSD8 leaves *your* wallet. If you have no tQDAY or tUSD8, the page shows the faucet link and your address to paste.
+- **Share link:** every open job has a copyable link (`/job/<id>`, also `?job=<id>`) plus a native Share button on phones. Send it to the freelancer.
+- **Freelancer:** opens the link, connects the wallet being paid, pastes the public proof link and signs `submitProof`. The contract only accepts proof from the payee wallet. The agent verifies and pays out as usual.
+- **My jobs:** with a wallet connected, the jobs list shows only jobs where you are the client ("you pay") or payee ("you get paid"). It reads them from the escrow contract itself (`getJob` per job; parties are cached because they never change), so it survives server restarts.
+- **Saved people are private and permanent.** Each wallet has its own list (name → 0x wallet + X handle), stored in Cloudflare D1. To see or change it you sign in once with a free `personal_sign` message (no transaction, no gas). The server checks the signature, a 10-minute window and a single-use nonce, then issues a 7-day HMAC session bound to that wallet. Unsigned or forged writes get `401`.
+
+**Demo mode (for judges and the live demo).** With no wallet connected, a clearly labelled demo banner shows two shared server-held test wallets (client + freelancer "@sarah"), so anyone can click through the whole flow without a wallet. The demo has its own shared Saved people list. Connecting a wallet switches demo mode off; **Disconnect** brings it back.
+
+**What survives a restart.** The chain is the source of truth for money and job state. Briefs (content-addressed by their on-chain `briefHash`, re-hashed on load), job records/receipts and saved people are written through to D1 and reloaded on boot. Without `PROOFPAY_STORE_URL` the app falls back to local JSON files (fine for local dev).
 
 ## Safety, trust and controls
 
@@ -62,7 +76,7 @@ Freelancers, creators, clippers and promoters, especially in emerging markets li
 | Fake tokens | Fee-on-transfer tokens are rejected (balance-delta check). Only the official tUSD8 address is configured. |
 | Key hygiene | Keys live outside the repo (`~/.secrets/aevum/wallet.env`, chmod 600). The server loads only the agent/demo keys and never the owner key. `.gitignore` blocks env and key files. Testnet only. |
 
-Known limitations (MVP): the JSON file store is a cache (the chain is the source of truth). Saved people also live in a local JSON file and may reset when a free host restarts. DNS-rebinding between the check and the fetch is not fully closed. X verification uses X's public syndication endpoint, so protected or deleted posts can't be verified. A malicious client can refund right after a rejection; the payee's protection is the 3-strike rule plus the receipt trail.
+Known limitations (MVP): briefs, job records and saved people persist in Cloudflare D1 when `PROOFPAY_STORE_URL` is set (local JSON otherwise); the chain stays the source of truth. Wallet sign-in supports normal (EOA) wallets; smart-contract wallets (ERC-1271) aren't supported yet. DNS-rebinding between the check and the fetch is not fully closed. X verification uses X's public syndication endpoint, so protected or deleted posts can't be verified. A malicious client can refund right after a rejection; the payee's protection is the 3-strike rule plus the receipt trail.
 
 ## Run it
 

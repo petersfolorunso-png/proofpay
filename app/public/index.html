@@ -19,11 +19,14 @@
       <p>Describe the job in plain words. Your tUSD8 is locked in escrow. The freelancer pastes a public link, an AI agent checks it against your brief, and pays out on-chain in seconds with a verifiable receipt.</p>
     </section>
 
+    <div id="modeBanner" class="mode"></div>
+
     <section class="card" id="wallets">
       <div class="row between">
         <h2>Wallets</h2>
         <div class="row gap">
-          <label class="switch" id="demoSwitchWrap" hidden><input type="checkbox" id="demoSwitch" checked /> demo wallets</label>
+          <button class="ghost small" id="refreshWalletBtn" title="Refresh balances">↻</button>
+          <label class="switch" id="demoSwitchWrap" hidden><input type="checkbox" id="demoSwitch" checked /> demo mode</label>
           <button class="ghost" id="connectBtn">Connect wallet</button>
         </div>
       </div>
@@ -31,7 +34,7 @@
     </section>
 
     <section class="card" id="people">
-      <h2>Saved people</h2>
+      <h2 id="peopleTitle">Saved people</h2>
       <p class="muted people-lead">Save a name, their 0x wallet and (optionally) their X handle. After that, “pay @name …” in the job box will find them.</p>
       <form id="peopleForm" class="people-form" autocomplete="off">
         <label>Name
@@ -46,12 +49,12 @@
         <button type="submit" id="savePersonBtn">Save</button>
       </form>
       <div id="peopleList" class="people-list"><p class="muted">Loading…</p></div>
-      <p class="muted people-note">Saved people live on this server and may reset when the free demo restarts. On-chain jobs are not affected.</p>
+      <p class="muted people-note" id="peopleNote"></p>
     </section>
 
     <section class="card">
       <h2>1 · Describe the job</h2>
-      <textarea id="jobText" rows="3" placeholder='Pay @sarah 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow'></textarea>
+      <textarea id="jobText" rows="3" placeholder='Pay @sarah 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow'></textarea>
       <div class="row between">
         <div class="examples" id="examples"></div>
         <button id="draftBtn">Draft escrow</button>
@@ -60,7 +63,7 @@
     </section>
 
     <section class="card">
-      <div class="row between"><h2>2 · Jobs</h2><button class="ghost small" id="refreshBtn">Refresh</button></div>
+      <div class="row between"><h2 id="jobsTitle">2 · Jobs</h2><button class="ghost small" id="refreshBtn">Refresh</button></div>
       <div id="jobs" class="jobs"><p class="muted">No jobs yet.</p></div>
     </section>
 

@@ -53,67 +53,116 @@ export function unknownPayeeMessage(handle?: string): string {
   return "Who should get paid? Save them in Saved people first, or paste a 0x address.";
 }
 
-function isProtected(name: string, demoMode: boolean): boolean {
-  return demoMode && (PROTECTED_DEMO_NAMES as readonly string[]).includes(name);
+function isProtected(owner: string, name: string, demoMode: boolean): boolean {
+  return owner === DEMO_OWNER && demoMode && (PROTECTED_DEMO_NAMES as readonly string[]).includes(name);
 }
 
-/** File-backed address book. Demo names (sarah, ada) are injected at read time and cannot be overwritten in demo mode. */
-export class ContactBook {
-  private file: string;
-  private max: number;
-  constructor(dir: string, max = MAX_CONTACTS) {
-    mkdirSync(dir, { recursive: true });
-    this.file = join(dir, "contacts.json");
-    this.max = max;
-  }
+/** "demo" (the shared demo list) or a lowercase 0x wallet address. */
+export const DEMO_OWNER = "demo";
+export function sanitizeOwner(raw: unknown): string {
+  const o = String(raw ?? "").trim().toLowerCase();
+  if (o === DEMO_OWNER || /^0x[0-9a-f]{40}$/.test(o)) return o;
+  throw new ContactError(400, "Unknown owner for Saved people.");
+}
 
-  private readFile(): Record<string, Contact> {
+/** Where saved people are kept. Owner is "demo" or a lowercase wallet address; name is already sanitized. */
+export interface ContactBackend {
+  readonly kind: string;
+  list(owner: string): Promise<Record<string, Contact>>;
+  /** Insert or update. Must throw ContactError(400, "...full...") when a NEW name would exceed `max`. */
+  put(owner: string, name: string, c: { address: `0x${string}`; handle: string }, max: number): Promise<void>;
+  /** Returns false when the name wasn't there. */
+  del(owner: string, name: string): Promise<boolean>;
+}
+
+/** Local JSON file backend (dev / fallback). Not durable on free hosts. */
+export class FileContacts implements ContactBackend {
+  readonly kind = "file";
+  private file: string;
+  constructor(dir: string) {
+    mkdirSync(dir, { recursive: true });
+    this.file = join(dir, "contacts-by-owner.json");
+    // One-time import of the old shared list (contacts.json) as the demo list.
+    const legacy = join(dir, "contacts.json");
+    if (!existsSync(this.file) && existsSync(legacy)) {
+      try {
+        const old = JSON.parse(readFileSync(legacy, "utf8"));
+        if (old && typeof old === "object" && !Array.isArray(old)) this.write({ [DEMO_OWNER]: old });
+      } catch {
+        /* ignore a corrupt legacy file */
+      }
+    }
+  }
+  private read(): Record<string, Record<string, Contact>> {
     if (!existsSync(this.file)) return {};
     try {
       const raw = JSON.parse(readFileSync(this.file, "utf8"));
-      if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
-      return raw as Record<string, Contact>;
+      return raw && typeof raw === "object" && !Array.isArray(raw) ? raw : {};
     } catch {
       return {};
     }
   }
-
-  private writeFile(c: Record<string, Contact>) {
+  private write(all: Record<string, Record<string, Contact>>) {
     const tmp = this.file + ".tmp";
-    writeFileSync(tmp, JSON.stringify(c, null, 2));
+    writeFileSync(tmp, JSON.stringify(all, null, 2));
     renameSync(tmp, this.file);
   }
+  async list(owner: string) {
+    return { ...(this.read()[owner] ?? {}) };
+  }
+  async put(owner: string, name: string, c: { address: `0x${string}`; handle: string }, max: number) {
+    const all = this.read();
+    const mine = (all[owner] ??= {});
+    if (!mine[name] && Object.keys(mine).length >= max) throw new ContactError(400, `Saved people is full (${max}). Remove someone first.`);
+    mine[name] = c;
+    this.write(all);
+  }
+  async del(owner: string, name: string) {
+    const all = this.read();
+    if (!all[owner]?.[name]) return false;
+    delete all[owner][name];
+    this.write(all);
+    return true;
+  }
+}
 
-  list(demo?: { address: `0x${string}`; handle: string } | null): Record<string, SavedContact> {
-    const c: Record<string, SavedContact> = { ...this.readFile() };
-    if (demo) {
-      for (const name of PROTECTED_DEMO_NAMES) {
-        c[name] = { address: demo.address, handle: demo.handle, builtin: true };
-      }
+/**
+ * Saved people, one list per owner. The demo list (owner "demo") gets sarah/ada injected at read time,
+ * and in demo mode those names can't be overwritten or removed. Wallet owners must be authenticated by
+ * the caller (signed sign-in message) before upsert/remove.
+ */
+export class Contacts {
+  readonly backend: ContactBackend;
+  private max: number;
+  constructor(backend: ContactBackend, max = MAX_CONTACTS) {
+    this.backend = backend;
+    this.max = max;
+  }
+
+  async list(owner: string, demo?: { address: `0x${string}`; handle: string } | null): Promise<Record<string, SavedContact>> {
+    const o = sanitizeOwner(owner);
+    const c: Record<string, SavedContact> = { ...(await this.backend.list(o)) };
+    if (demo && o === DEMO_OWNER) {
+      for (const name of PROTECTED_DEMO_NAMES) c[name] = { address: demo.address, handle: demo.handle, builtin: true };
     }
     return c;
   }
 
-  upsert(input: { name?: unknown; address?: unknown; handle?: unknown }, demoMode: boolean): SavedContact {
+  async upsert(owner: string, input: { name?: unknown; address?: unknown; handle?: unknown }, demoMode: boolean): Promise<SavedContact> {
+    const o = sanitizeOwner(owner);
     const name = sanitizeName(input.name);
-    if (isProtected(name, demoMode)) throw new ContactError(400, `@${name} is a built-in demo contact and can't be changed.`);
+    if (isProtected(o, name, demoMode)) throw new ContactError(400, `@${name} is a built-in demo contact and can't be changed.`);
     const address = sanitizeAddress(input.address);
     const handle = sanitizeHandle(input.handle, name);
-    const c = this.readFile();
-    if (!c[name] && Object.keys(c).length >= this.max) {
-      throw new ContactError(400, `Saved people is full (${this.max}). Remove someone first.`);
-    }
-    c[name] = { address, handle };
-    this.writeFile(c);
-    return c[name];
+    if (o !== DEMO_OWNER && address.toLowerCase() === o) throw new ContactError(400, "That's your own wallet. Save the person you want to pay.");
+    await this.backend.put(o, name, { address, handle }, this.max);
+    return { address, handle };
   }
 
-  remove(rawName: unknown, demoMode: boolean): void {
+  async remove(owner: string, rawName: unknown, demoMode: boolean): Promise<void> {
+    const o = sanitizeOwner(owner);
     const name = sanitizeName(rawName);
-    if (isProtected(name, demoMode)) throw new ContactError(400, `@${name} is a built-in demo contact and can't be removed.`);
-    const c = this.readFile();
-    if (!c[name]) throw new ContactError(404, `@${name} isn't in Saved people.`);
-    delete c[name];
-    this.writeFile(c);
+    if (isProtected(o, name, demoMode)) throw new ContactError(400, `@${name} is a built-in demo contact and can't be removed.`);
+    if (!(await this.backend.del(o, name))) throw new ContactError(404, `@${name} isn't in Saved people.`);
   }
 }

@@ -66,7 +66,7 @@ Full hashes and receipts: `deployments/testnet-e2e.json`.
 ### Live demo / website
 **Live (Render free plan, Frankfurt):** https://proofpay-hleb.onrender.com
 
-Demo wallets are on. The first load after ~15 minutes idle can take about a minute (free-plan spin-down). Job/brief state is a local JSON file, so it resets when the service restarts or spins down; on-chain jobs stay on Aevum. MTN and Airtel in Nigeria often block `onrender.com` — wifi, Glo, or the 1.1.1.1 app usually work.
+Two modes: **demo mode** (no wallet needed; shared, clearly labelled test wallets so judges can click through) and **your own wallet** (MetaMask/Rabby or a phone wallet's in-app browser; Aevum Testnet is added automatically). With a wallet, the client funds jobs from their own wallet, gets a share link per job for the freelancer, sees "My jobs" read from the escrow contract, and keeps a private Saved people list (sign in with a free signature, stored on Cloudflare D1, survives restarts). The first load after ~15 minutes idle can take about a minute (free-plan spin-down). MTN and Airtel in Nigeria often block `onrender.com` — wifi, Glo, or the 1.1.1.1 app usually work.
 
 Judges can also run the packaged Docker image:
 

@@ -4,7 +4,10 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  ContactBook,
+  Contacts,
+  FileContacts,
+  DEMO_OWNER,
+  sanitizeOwner,
   ContactError,
   MAX_CONTACTS,
   sanitizeAddress,
@@ -19,8 +22,11 @@ const OTHER = "0x0000000000000000000000000000000000000001" as const;
 const now = new Date("2026-11-19T08:00:00Z");
 
 function book(max?: number) {
-  return new ContactBook(mkdtempSync(join(tmpdir(), "proofpay-contacts-")), max);
+  return new Contacts(new FileContacts(mkdtempSync(join(tmpdir(), "proofpay-contacts-"))), max);
 }
+const D = DEMO_OWNER;
+const ME = "0x00000000000000000000000000000000000000aa";
+const YOU = "0x00000000000000000000000000000000000000bb";
 
 test("sanitizes name and handle (lowercase, strip @, reject junk)", () => {
   assert.equal(sanitizeName("@DeeStar"), "deestar");
@@ -53,27 +59,27 @@ test("parseRules uses a saved contact and names the missing one", () => {
   assert.throws(() => parseRules("pay @deestar 0.5 tUSD8 for a post mentioning $DCTY", {}, now), /Save @deestar in Saved people first/);
 });
 
-test("upsert, list, update and remove a contact", () => {
+test("upsert, list, update and remove a contact", async () => {
   const b = book();
-  const saved = b.upsert({ name: "@DeeStar", address: SARAH.toLowerCase() }, false);
+  const saved = await b.upsert(D, { name: "@DeeStar", address: SARAH.toLowerCase() }, false);
   assert.deepEqual(saved, { address: SARAH, handle: "deestar" });
-  assert.equal(b.list()["deestar"].address, SARAH);
+  assert.equal((await b.list(D))["deestar"].address, SARAH);
 
-  const updated = b.upsert({ name: "deestar", address: OTHER, handle: "@clipper" }, false);
+  const updated = await b.upsert(D, { name: "deestar", address: OTHER, handle: "@clipper" }, false);
   assert.deepEqual(updated, { address: OTHER, handle: "clipper" });
-  assert.equal(Object.keys(b.list()).length, 1);
+  assert.equal(Object.keys(await b.list(D)).length, 1);
 
-  b.remove("@deestar", false);
-  assert.deepEqual(b.list(), {});
-  assert.throws(() => b.remove("deestar", false), (e: unknown) => e instanceof ContactError && e.status === 404);
+  await b.remove(D, "@deestar", false);
+  assert.deepEqual(await b.list(D), {});
+  await assert.rejects(() => b.remove(D, "deestar", false), (e: unknown) => e instanceof ContactError && e.status === 404);
 });
 
-test("demo mode injects sarah/ada and blocks overwrite or remove", () => {
+test("demo mode injects sarah/ada and blocks overwrite or remove", async () => {
   const b = book();
-  b.upsert({ name: "deestar", address: OTHER }, false);
+  await b.upsert(D, { name: "deestar", address: OTHER }, false);
   // a stale file entry for sarah is ignored in demo mode
-  b.upsert({ name: "sarah", address: OTHER, handle: "hacked" }, false);
-  const listed = b.list({ address: SARAH, handle: "sarah" });
+  await b.upsert(D, { name: "sarah", address: OTHER, handle: "hacked" }, false);
+  const listed = await b.list(D, { address: SARAH, handle: "sarah" });
   assert.equal(listed.sarah.address, SARAH);
   assert.equal(listed.sarah.builtin, true);
   assert.equal(listed.ada.builtin, true);
@@ -81,22 +87,45 @@ test("demo mode injects sarah/ada and blocks overwrite or remove", () => {
   assert.equal(listed.deestar.address, OTHER);
   assert.equal(listed.deestar.builtin, undefined);
 
-  assert.throws(() => b.upsert({ name: "sarah", address: OTHER }, true), /can't be changed/);
-  assert.throws(() => b.upsert({ name: "@Ada", address: OTHER }, true), /can't be changed/);
-  assert.throws(() => b.remove("sarah", true), /can't be removed/);
-  assert.throws(() => b.remove("ada", true), /can't be removed/);
+  await assert.rejects(() => b.upsert(D, { name: "sarah", address: OTHER }, true), /can't be changed/);
+  await assert.rejects(() => b.upsert(D, { name: "@Ada", address: OTHER }, true), /can't be changed/);
+  await assert.rejects(() => b.remove(D, "sarah", true), /can't be removed/);
+  await assert.rejects(() => b.remove(D, "ada", true), /can't be removed/);
   // still allowed when demo mode is off
-  b.remove("deestar", true);
-  assert.ok(!b.list({ address: SARAH, handle: "sarah" }).deestar);
+  await b.remove(D, "deestar", true);
+  assert.ok(!(await b.list(D, { address: SARAH, handle: "sarah" })).deestar);
 });
 
-test("caps the number of saved people", () => {
+test("caps the number of saved people per owner", async () => {
   const b = book(2);
-  b.upsert({ name: "one", address: SARAH }, false);
-  b.upsert({ name: "two", address: OTHER }, false);
-  assert.throws(() => b.upsert({ name: "three", address: SARAH }, false), /full \(2\)/);
+  await b.upsert(ME, { name: "one", address: SARAH }, false);
+  await b.upsert(ME, { name: "two", address: OTHER }, false);
+  await assert.rejects(() => b.upsert(ME, { name: "three", address: SARAH }, false), /full \(2\)/);
   // updating an existing name does not count as a new slot
-  const updated = b.upsert({ name: "one", address: OTHER }, false);
+  const updated = await b.upsert(ME, { name: "one", address: OTHER }, false);
   assert.equal(updated.address, OTHER);
+  // another owner has their own quota
+  await b.upsert(YOU, { name: "three", address: SARAH }, false);
   assert.equal(MAX_CONTACTS, 200);
+});
+
+test("each wallet has its own private list; demo names aren't injected there", async () => {
+  const b = book();
+  await b.upsert(ME, { name: "deestar", address: SARAH }, true);
+  await b.upsert(YOU, { name: "deestar", address: OTHER }, true);
+  assert.equal((await b.list(ME, { address: SARAH, handle: "sarah" })).deestar.address, SARAH);
+  assert.equal((await b.list(YOU)).deestar.address, OTHER);
+  assert.equal((await b.list(ME, { address: SARAH, handle: "sarah" })).sarah, undefined);
+  assert.deepEqual(await b.list(D), {});
+  // "sarah" is a normal name for a wallet owner
+  await b.upsert(ME, { name: "sarah", address: OTHER }, true);
+  await b.remove(ME, "sarah", true);
+  await assert.rejects(() => b.upsert(ME, { name: "me", address: ME }, false), /your own wallet/);
+});
+
+test("owner must be demo or a wallet address", () => {
+  assert.equal(sanitizeOwner("DEMO"), "demo");
+  assert.equal(sanitizeOwner(ME.toUpperCase().replace("0X", "0x")), ME);
+  assert.throws(() => sanitizeOwner("0x123"), ContactError);
+  assert.throws(() => sanitizeOwner("../etc"), ContactError);
 });

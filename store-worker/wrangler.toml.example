@@ -1,0 +1,14 @@
+# Copy to wrangler.toml, fill in your D1 id, then:
+#   npx wrangler d1 create proofpay-store
+#   npx wrangler d1 execute proofpay-store --remote --file=schema.sql
+#   npx wrangler deploy && npx wrangler secret put TOKEN
+# Then set PROOFPAY_STORE_URL / PROOFPAY_STORE_TOKEN (and SESSION_SECRET) on the ProofPay server.
+name = "proofpay-store"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[[d1_databases]]
+binding = "DB"
+database_name = "proofpay-store"
+database_id = "<your-d1-database-id>"

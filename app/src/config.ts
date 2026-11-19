@@ -14,13 +14,14 @@ export function loadEnvFile(path: string): Record<string, string> {
 }
 
 const secretsPath = process.env.PROOFPAY_SECRETS ?? resolve(homedir(), ".secrets/aevum/wallet.env");
-const secrets = loadEnvFile(secretsPath);
+const storeSecretsPath = process.env.PROOFPAY_STORE_SECRETS ?? resolve(homedir(), ".secrets/aevum/proofpay-store.env");
+const secrets = { ...loadEnvFile(secretsPath), ...(process.env.NODE_TEST_CONTEXT ? {} : loadEnvFile(storeSecretsPath)) };
 // Public deployment info (committed) is the default source for the escrow address on Aevum.
 const deployFile = resolve(import.meta.dirname, "../../deployments/aevum-testnet.json");
 const deployment: Record<string, string> =
   existsSync(deployFile) && (process.env.CHAIN_ID ?? "44005") === "44005" ? JSON.parse(readFileSync(deployFile, "utf8")) : {};
 // Only these keys may come from the secrets file; the owner key is never read by the server.
-const SECRET_KEYS = new Set(["AGENT_PRIVATE_KEY", "DEMO_CLIENT_PRIVATE_KEY", "DEMO_FREELANCER_PRIVATE_KEY", "GEMINI_API_KEY", "DEMO_WALLETS", "DEMO_FREELANCER_X"]);
+const SECRET_KEYS = new Set(["AGENT_PRIVATE_KEY", "DEMO_CLIENT_PRIVATE_KEY", "DEMO_FREELANCER_PRIVATE_KEY", "GEMINI_API_KEY", "DEMO_WALLETS", "DEMO_FREELANCER_X", "PROOFPAY_STORE_URL", "PROOFPAY_STORE_TOKEN", "SESSION_SECRET"]);
 const env = (k: string, d?: string) => process.env[k] ?? (SECRET_KEYS.has(k) ? secrets[k] : undefined) ?? d;
 
 export type Hex = `0x${string}`;
@@ -53,6 +54,12 @@ export const config = {
   dataDir: env("DATA_DIR", resolve(process.cwd(), "data"))!,
   /** Test-only: resolve fixture://name proof URLs from this directory. Never set in production. */
   proofFixturesDir: env("PROOF_FIXTURES_DIR"),
+  /** Durable store (Cloudflare D1 via the proofpay-store Worker). Unset = local JSON files only. */
+  storeUrl: env("PROOFPAY_STORE_URL"),
+  storeToken: env("PROOFPAY_STORE_TOKEN"),
+  /** HMAC key for wallet sign-in sessions. Unset = random per process (sessions end on restart). */
+  sessionSecret: env("SESSION_SECRET"),
+  faucetUrl: "https://faucet.qday.info/en",
   tokenDecimals: 6,
   tokenSymbol: "tUSD8",
 };

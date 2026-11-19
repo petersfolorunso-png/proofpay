@@ -6,11 +6,16 @@ let CFG = null;
 let ABI = null;
 let selected = null;
 let pollTimer = null;
-let wallet = null; // { client, account, viem } when an injected wallet is connected
+let wallet = null; // { client, account, viem, pub, chain } when an injected wallet is connected
+let session = null; // { token, owner, expiresAt } after a free personal_sign sign-in
 let draft = null;
+const eth = () => window.ethereum;
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
 const api = async (path, opts = {}) => {
-  const res = await fetch(path, { headers: { "content-type": "application/json" }, ...opts, body: opts.body ? JSON.stringify(opts.body) : undefined });
+  const headers = { "content-type": "application/json" };
+  if (opts.auth && session) headers.authorization = `Bearer ${session.token}`;
+  const res = await fetch(path, { headers, method: opts.method, body: opts.body ? JSON.stringify(opts.body) : undefined });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
@@ -25,7 +30,10 @@ const toast = (msg, err = false) => {
 };
 const txLink = (h, label = "view tx") => (h ? `<a href="${CFG.explorerUrl}/tx/${esc(h)}" target="_blank" rel="noopener">${esc(label)} ↗</a>` : "");
 const addrLink = (a) => `<a class="mono" href="${CFG.explorerUrl}/address/${esc(a)}" target="_blank" rel="noopener">${esc(short(a))}</a>`;
-const useDemo = () => CFG.demo && $("#demoSwitch").checked && !wallet;
+const useDemo = () => !!CFG.demo && $("#demoSwitch").checked && !wallet;
+const same = (a, b) => !!a && !!b && a.toLowerCase() === b.toLowerCase();
+const faucetHtml = () => `<a href="${esc(CFG.faucet || "https://faucet.qday.info/en")}" target="_blank" rel="noopener">QDay faucet</a>`;
+const shareUrl = (id) => `${location.origin}/job/${id}`;
 const busy = async (btn, fn) => {
   const label = btn.innerHTML;
   btn.disabled = true;
@@ -49,26 +57,72 @@ async function boot() {
     ? `Escrow ${addrLink(CFG.escrow)} · Agent ${CFG.agent ? addrLink(CFG.agent) : "read-only"} · cap ${esc(CFG.params?.agentReleaseCap ?? "?")} tUSD8/job`
     : "Escrow not deployed yet";
   if (CFG.demo) $("#demoSwitchWrap").hidden = false;
+  else $("#demoSwitch").checked = false;
   const ex = [
-    `Pay @sarah 5 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow`,
-    `Pay 0x… 20 tUSD8 for a blog post that links qday.io within 3 days`,
-    `Pay @sarah $3 for a GitHub PR to proofpay with "fix" in the title by friday`,
+    `Pay @sarah 1 tUSD8 when she posts a tweet saying "ProofPay is live" with #Aevum by tomorrow`,
+    `Pay 0x… 1 tUSD8 for a blog post that links qday.io within 3 days`,
+    `Pay @sarah $0.5 for a GitHub PR to proofpay with "fix" in the title by friday`,
   ];
   $("#examples").innerHTML = ex.map((e, i) => `<button class="chip" data-i="${i}">Example ${i + 1}</button>`).join("");
   $("#examples").onclick = (e) => {
     const i = e.target.dataset?.i;
     if (i !== undefined) $("#jobText").value = ex[i];
   };
+  await reconnectSilently();
+  renderAll();
+  const m = location.pathname.match(/^\/job\/(\d+)/) || location.search.match(/[?&]job=(\d+)/);
+  if (m) {
+    await openJob(m[1]);
+    $("#jobDetail").scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+function renderAll() {
+  renderMode();
   renderWallets();
   loadPeople();
   loadJobs();
-  const m = location.pathname.match(/^\/job\/(\d+)/);
-  if (m) openJob(m[1]);
+  if (selected) openJob(selected);
+}
+
+function renderMode() {
+  const demo = useDemo();
+  const b = $("#modeBanner");
+  b.className = "mode " + (wallet ? "mode-wallet" : demo ? "mode-demo" : "mode-none");
+  b.innerHTML = wallet
+    ? `🔐 <b>Your wallet</b> · ${addrLink(wallet.account)} on Aevum testnet. Jobs, saved people and payments use this wallet. <button class="ghost small" id="disconnectBtn">Disconnect</button>`
+    : demo
+      ? `🧪 <b>Demo mode</b> · shared test wallets anyone can click through, no wallet needed. Connect your own wallet to use ProofPay for real (still free testnet money).`
+      : `Connect a wallet to create a job or deliver one. Everything runs on the free Aevum testnet.`;
+  $("#connectBtn").textContent = wallet ? short(wallet.account) : "Connect wallet";
+  $("#demoSwitchWrap").hidden = !CFG.demo || !!wallet;
+  $("#jobsTitle").textContent = wallet ? "2 · My jobs" : demo ? "2 · Jobs (demo)" : "2 · Recent jobs";
+  const d = $("#disconnectBtn");
+  if (d) d.onclick = disconnect;
+}
+
+async function walletBalances(addr) {
+  const { pub, viem } = wallet;
+  const [t, g] = await Promise.all([
+    pub.readContract({ address: CFG.token, abi: ABI.erc20, functionName: "balanceOf", args: [addr] }),
+    pub.getBalance({ address: addr }),
+  ]);
+  return { tUSD8: viem.formatUnits(t, CFG.tokenDecimals), gas: viem.formatUnits(g, 18), rawT: t, rawG: g };
 }
 
 async function renderWallets() {
   if (wallet) {
-    $("#walletInfo").innerHTML = `Connected: ${addrLink(wallet.account)} — you can create jobs (as client) or submit proof (as the payee).`;
+    $("#walletInfo").innerHTML = `<p class="muted">Loading your balances…</p>`;
+    try {
+      const b = await walletBalances(wallet.account);
+      const empty = b.rawT === 0n || b.rawG === 0n;
+      $("#walletInfo").innerHTML = `<div class="balances"><div class="bal"><div class="muted">Your wallet</div><div class="big">${Number(b.tUSD8).toLocaleString()} tUSD8</div><div class="mono">${addrLink(wallet.account)} · ${Number(b.gas).toFixed(4)} tQDAY</div><div class="muted" style="font-size:12px">tUSD8 pays jobs · tQDAY pays the tiny network fee</div></div></div>
+        ${empty ? `<div class="callout">💧 ${b.rawG === 0n ? "You need a little <b>tQDAY</b> for network fees" : ""}${b.rawG === 0n && b.rawT === 0n ? " and " : b.rawT === 0n ? "You need " : ""}${b.rawT === 0n ? "<b>tUSD8</b> to pay for jobs" : ""}. They're free test tokens: get them from the ${faucetHtml()} (or the faucet bot in the QDay Discord), then tap Refresh. <div class="mono" style="margin-top:6px">Your address: ${esc(wallet.account)} <button class="ghost small" id="copyAddrBtn">Copy</button></div></div>` : ""}`;
+      const c = $("#copyAddrBtn");
+      if (c) c.onclick = () => copyText(wallet.account, "Address copied");
+    } catch (e) {
+      $("#walletInfo").innerHTML = `Connected: ${addrLink(wallet.account)}. <span class="muted">Couldn't read balances (${esc(e.message)}).</span>`;
+    }
     return;
   }
   if (useDemo()) {
@@ -80,20 +134,102 @@ async function renderWallets() {
       $("#walletInfo").textContent = "Demo wallets: " + e.message;
     }
   } else {
-    $("#walletInfo").innerHTML = `Connect a browser wallet on Aevum Testnet (chain ${CFG.chainId}) to create or deliver jobs. Get tQDAY + tUSD8 from the <a href="https://faucet.qday.info/en" target="_blank">faucet</a>.`;
+    $("#walletInfo").innerHTML = noWalletHelp();
   }
 }
 
-$("#demoSwitch").onchange = renderWallets;
+function noWalletHelp() {
+  const here = `${location.host}${location.pathname}${location.search}`;
+  if (eth()) return `<p>Tap <b>Connect wallet</b>. We'll add the Aevum testnet (chain ${CFG.chainId}) to your wallet for you. Free test tokens: ${faucetHtml()}.</p>`;
+  if (isMobile())
+    return `<p>On a phone, open ProofPay inside your wallet app's browser:</p>
+      <div class="row gap"><a class="btn" href="https://metamask.app.link/dapp/${esc(here)}">Open in MetaMask</a><a class="btn ghost" href="https://link.trustwallet.com/open_url?coin_id=60&url=${encodeURIComponent(location.href)}">Open in Trust Wallet</a></div>
+      <p class="muted" style="font-size:13px">Other wallets (OKX, Bitget, Coinbase…): copy this link and paste it into the wallet's built-in browser. <button class="ghost small" id="copyLinkBtn">Copy link</button></p>`;
+  return `<p>No browser wallet found. Install <a href="https://metamask.io/download/" target="_blank" rel="noopener">MetaMask</a> (or Rabby), then refresh. Free test tokens: ${faucetHtml()}.</p>`;
+}
+
+$("#demoSwitch").onchange = () => renderAll();
+document.addEventListener("click", (e) => {
+  if (e.target.id === "copyLinkBtn") copyText(location.href, "Link copied");
+});
+
+async function copyText(text, msg = "Copied") {
+  try {
+    await navigator.clipboard.writeText(text);
+    toast(msg);
+  } catch {
+    window.prompt("Copy this:", text);
+  }
+}
 
 // ------------------------------------------------------------------ saved people
-async function loadPeople() {
+const sessKey = (a) => `pp_session_${a.toLowerCase()}`;
+function loadSession() {
+  session = null;
+  if (!wallet) return;
   try {
-    renderPeople(await api("/api/contacts"));
+    const s = JSON.parse(localStorage.getItem(sessKey(wallet.account)) || "null");
+    if (s && s.expiresAt > Date.now() + 60_000 && same(s.owner, wallet.account)) session = s;
+  } catch {}
+}
+
+async function signIn() {
+  await ensureChain();
+  const nonce = [...crypto.getRandomValues(new Uint8Array(12))].map((b) => b.toString(16).padStart(2, "0")).join("");
+  const message = [
+    "ProofPay sign-in",
+    "",
+    "Sign this to manage your Saved people on ProofPay. It's free: no transaction, no gas.",
+    "",
+    `Wallet: ${wallet.viem.getAddress(wallet.account)}`,
+    `Chain ID: ${CFG.chainId}`,
+    `Issued at: ${new Date().toISOString()}`,
+    `Nonce: ${nonce}`,
+  ].join("\n");
+  const signature = await wallet.client.signMessage({ account: wallet.account, message });
+  session = await api("/api/auth/login", { method: "POST", body: { message, signature } });
+  localStorage.setItem(sessKey(wallet.account), JSON.stringify(session));
+  toast("Signed in. Your saved people are private to this wallet.");
+  await loadPeople();
+}
+
+async function loadPeople() {
+  const note = $("#peopleNote");
+  const form = $("#peopleForm");
+  note.textContent =
+    CFG.storage === "durable"
+      ? wallet
+        ? "Only you can see or change this list. It's kept safely, even when the server restarts."
+        : "This is the shared demo list. It's kept even when the server restarts."
+      : "Saved people live on this server and may reset when it restarts. On-chain jobs are not affected.";
+  $("#peopleTitle").textContent = wallet ? "My saved people" : "Saved people (demo list)";
+  if (wallet && !session) {
+    form.hidden = true;
+    $("#peopleList").innerHTML = `<div class="callout">Your saved people are private to your wallet. Sign in once to see and edit them. It's a free signature, no gas, no transaction.<div class="row gap"><button id="signInBtn">Sign in with wallet</button></div></div>`;
+    $("#signInBtn").onclick = () => busy($("#signInBtn"), signIn);
+    return;
+  }
+  if (!wallet && !useDemo()) {
+    form.hidden = true;
+    $("#peopleList").innerHTML = `<p class="muted">Connect your wallet to save the people you pay.</p>`;
+    return;
+  }
+  form.hidden = false;
+  try {
+    renderPeople(await api(peoplePath(), { auth: true }));
   } catch (e) {
+    if (/sign in/i.test(e.message) && wallet) {
+      localStorage.removeItem(sessKey(wallet.account));
+      session = null;
+      return loadPeople();
+    }
     $("#peopleList").innerHTML = `<p class="muted">${esc(e.message)}</p>`;
   }
 }
+const peoplePath = (name) => {
+  const base = name ? `/api/contacts/${encodeURIComponent(name)}` : "/api/contacts";
+  return wallet ? `${base}?owner=${wallet.account.toLowerCase()}` : base;
+};
 function renderPeople(map) {
   const entries = Object.entries(map ?? {});
   if (!entries.length) {
@@ -122,7 +258,7 @@ $("#peopleForm").onsubmit = (e) => {
     const name = $("#personName").value.trim();
     const address = $("#personWallet").value.trim();
     const handle = $("#personHandle").value.trim();
-    await api("/api/contacts", { method: "POST", body: { name, address, handle: handle || undefined } });
+    await api("/api/contacts", { method: "POST", auth: true, body: { name, address, handle: handle || undefined, owner: wallet ? wallet.account.toLowerCase() : undefined } });
     toast(`Saved @${name.replace(/^@/, "").toLowerCase()}`);
     $("#peopleForm").reset();
     $("#personName").focus();
@@ -135,36 +271,92 @@ $("#peopleList").onclick = (e) => {
   const name = btn.dataset.remove;
   if (!confirm(`Remove @${name} from Saved people?`)) return;
   busy(btn, async () => {
-    await api(`/api/contacts/${encodeURIComponent(name)}`, { method: "DELETE" });
+    await api(peoplePath(name), { method: "DELETE", auth: true });
     toast(`Removed @${name}`);
     await loadPeople();
   });
 };
 
-$("#connectBtn").onclick = () =>
-  busy($("#connectBtn"), async () => {
-    if (!window.ethereum) throw new Error("No browser wallet found. Install MetaMask or Rabby, or use demo wallets.");
-    const viem = await import("https://esm.sh/viem@2.58.1");
-    const chain = viem.defineChain({ id: CFG.chainId, name: "QDay Aevum Testnet", nativeCurrency: { name: "tQDAY", symbol: "tQDAY", decimals: 18 }, rpcUrls: { default: { http: [CFG.rpcUrl] } }, blockExplorers: { default: { name: "Explorer", url: CFG.explorerUrl } } });
-    const client = viem.createWalletClient({ chain, transport: viem.custom(window.ethereum) });
-    const [account] = await client.requestAddresses();
-    try {
-      await client.switchChain({ id: chain.id });
-    } catch {
-      await client.addChain({ chain });
-    }
-    const pub = viem.createPublicClient({ chain, transport: viem.http(CFG.rpcUrl) });
-    wallet = { client, account, viem, pub, chain };
-    $("#connectBtn").textContent = short(account);
-    renderWallets();
+const chainHex = () => "0x" + CFG.chainId.toString(16);
+async function ensureChain() {
+  const p = eth();
+  if (!p) throw new Error("No wallet found");
+  if (parseInt(await p.request({ method: "eth_chainId" }), 16) === CFG.chainId) return;
+  try {
+    await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chainHex() }] });
+  } catch (e) {
+    if (e?.code === 4001) throw new Error("Please allow switching to the Aevum testnet in your wallet.");
+    // 4902 = unknown chain (mobile wallets sometimes wrap it), so add it, then switch.
+    await p.request({
+      method: "wallet_addEthereumChain",
+      params: [{ chainId: chainHex(), chainName: "QDay Aevum Testnet", nativeCurrency: { name: "tQDAY", symbol: "tQDAY", decimals: 18 }, rpcUrls: [CFG.rpcUrl], blockExplorerUrls: [CFG.explorerUrl] }],
+    });
+    if (parseInt(await p.request({ method: "eth_chainId" }), 16) !== CFG.chainId) await p.request({ method: "wallet_switchEthereumChain", params: [{ chainId: chainHex() }] });
+  }
+}
+
+let viemMod = null;
+async function setupWallet(account) {
+  viemMod ??= await import("https://esm.sh/viem@2.58.1");
+  const viem = viemMod;
+  const chain = viem.defineChain({ id: CFG.chainId, name: "QDay Aevum Testnet", nativeCurrency: { name: "tQDAY", symbol: "tQDAY", decimals: 18 }, rpcUrls: { default: { http: [CFG.rpcUrl] } }, blockExplorers: { default: { name: "Explorer", url: CFG.explorerUrl } } });
+  const client = viem.createWalletClient({ chain, transport: viem.custom(eth()) });
+  const pub = viem.createPublicClient({ chain, transport: viem.http(CFG.rpcUrl) });
+  wallet = { client, account: viem.getAddress(account), viem, pub, chain };
+  localStorage.setItem("pp_wallet", "1");
+  loadSession();
+}
+
+async function connect() {
+  if (!eth()) {
+    $("#walletInfo").innerHTML = noWalletHelp();
+    $("#wallets").scrollIntoView({ behavior: "smooth" });
+    throw new Error(isMobile() ? "Open this page in your wallet app's browser (buttons below)." : "No browser wallet found. Install MetaMask or Rabby, or use demo mode.");
+  }
+  const [account] = await eth().request({ method: "eth_requestAccounts" });
+  if (!account) throw new Error("No account was shared by the wallet.");
+  await ensureChain();
+  await setupWallet(account);
+  toast("Wallet connected");
+  renderAll();
+}
+
+async function reconnectSilently() {
+  if (!eth() || localStorage.getItem("pp_wallet") !== "1") return;
+  try {
+    const [account] = await eth().request({ method: "eth_accounts" });
+    if (account) await setupWallet(account);
+  } catch {}
+}
+
+function disconnect() {
+  wallet = null;
+  session = null;
+  localStorage.removeItem("pp_wallet");
+  toast(CFG.demo ? "Disconnected. Back to demo mode." : "Disconnected.");
+  renderAll();
+}
+
+$("#connectBtn").onclick = () => (wallet ? disconnect() : busy($("#connectBtn"), connect));
+if (eth()?.on) {
+  eth().on("accountsChanged", async (accts) => {
+    if (!wallet) return;
+    if (!accts?.length) return disconnect();
+    await setupWallet(accts[0]);
+    renderAll();
   });
+  eth().on("chainChanged", () => wallet && renderWallets());
+}
 
 async function walletWrite(address, abi, functionName, args) {
+  if (!wallet) throw new Error("Connect your wallet first");
+  await ensureChain();
   const { client, account, pub, chain } = wallet;
   const { request, result } = await pub.simulateContract({ address, abi, functionName, args, account });
+  toast("Confirm in your wallet…");
   const hash = await client.writeContract({ ...request, chain, account });
-  toast("Sent. Waiting for confirmation…");
-  const r = await pub.waitForTransactionReceipt({ hash });
+  toast("Sent. Waiting for the network to confirm…");
+  const r = await pub.waitForTransactionReceipt({ hash, timeout: 180_000 });
   if (r.status !== "success") throw new Error("Transaction reverted");
   return { hash, result };
 }
@@ -173,7 +365,14 @@ async function walletWrite(address, abi, functionName, args) {
 $("#draftBtn").onclick = () =>
   busy($("#draftBtn"), async () => {
     const text = $("#jobText").value.trim();
-    const r = await api("/api/parse", { method: "POST", body: { text } });
+    const owner = wallet ? (session ? wallet.account.toLowerCase() : "none") : undefined;
+    let r;
+    try {
+      r = await api("/api/parse", { method: "POST", auth: true, body: { text, owner } });
+    } catch (e) {
+      if (wallet && !session && /Saved people/.test(e.message)) throw new Error(e.message + " (Sign in under My saved people to use names.)");
+      throw e;
+    }
     draft = r;
     const b = r.brief;
     const reqs = [
@@ -210,12 +409,16 @@ async function lockFunds() {
   } else {
     if (!wallet) throw new Error("Connect a wallet (or enable demo wallets) first");
     const amount = BigInt(draft.amountBaseUnits);
+    const bal = await walletBalances(wallet.account);
+    if (bal.rawG === 0n) throw new Error("You need a little free tQDAY for network fees first. Get it from the QDay faucet (link under Wallets).");
+    if (bal.rawT < amount) throw new Error(`You have ${bal.tUSD8} tUSD8 but this job needs ${b.amount}. Get free tUSD8 from the faucet, or lower the amount.`);
+    if (same(b.payee, wallet.account)) throw new Error("You can't pay your own wallet. Pick the person you're paying.");
     const allowance = await wallet.pub.readContract({ address: CFG.token, abi: ABI.erc20, functionName: "allowance", args: [wallet.account, CFG.escrow] });
     if (allowance < amount) await walletWrite(CFG.token, ABI.erc20, "approve", [CFG.escrow, amount]);
     const r = await walletWrite(CFG.escrow, ABI.escrow, "createAndFund", [b.payee, amount, BigInt(b.deadline), draft.briefHash]);
     jobId = r.result.toString();
     await api(`/api/jobs/${jobId}/created`, { method: "POST", body: { txHash: r.hash } });
-    toast("Locked in escrow!");
+    toast("Locked in escrow! Send the job link to the person you're paying.");
   }
   $("#draft").innerHTML = "";
   $("#jobText").value = "";
@@ -228,12 +431,15 @@ async function lockFunds() {
 $("#refreshBtn").onclick = () => loadJobs();
 async function loadJobs() {
   try {
-    const jobs = await api("/api/jobs");
+    const jobs = await api(wallet ? `/api/jobs?wallet=${wallet.account}` : "/api/jobs");
+    const role = (j) => (j.role === "client" ? `<span class="badge">you pay</span>` : j.role === "payee" ? `<span class="badge paid">you get paid</span>` : j.role === "both" ? `<span class="badge">you</span>` : "");
     $("#jobs").innerHTML = jobs.length
       ? jobs
-          .map((j) => `<div class="job ${selected === j.jobId ? "sel" : ""}" data-id="${esc(j.jobId)}"><span class="muted">#${esc(j.jobId)}</span><span>${esc(j.brief?.title ?? "(brief not registered here)")}</span><span class="amt">${esc(j.amount)} tUSD8</span><span class="status s-${esc(j.status)}">${esc(label(j))}</span></div>`)
+          .map((j) => `<div class="job ${selected === j.jobId ? "sel" : ""}" data-id="${esc(j.jobId)}"><span class="muted">#${esc(j.jobId)}</span><span class="jt">${esc(j.brief?.title ?? "(job details not saved on this server)")} ${role(j)}</span><span class="amt">${esc(j.amount)} tUSD8</span><span class="status s-${esc(j.status)}">${esc(label(j))}</span></div>`)
           .join("")
-      : `<p class="muted">No jobs yet. Describe one above.</p>`;
+      : wallet
+        ? `<p class="muted">No jobs for this wallet yet. Create one above, or open a job link someone sent you.</p>`
+        : `<p class="muted">No jobs yet. Describe one above.</p>`;
     document.querySelectorAll(".job").forEach((el) => (el.onclick = () => openJob(el.dataset.id)));
   } catch (e) {
     $("#jobs").innerHTML = `<p class="muted">${esc(e.message)}</p>`;
@@ -263,8 +469,14 @@ function renderJob(j) {
     [j.status === "Refunded" ? "Refunded" : "Paid", ["Released", "Refunded"].includes(j.status)],
   ];
   const live = j.status === "ProofSubmitted" && j.agentState !== "needs_human";
-  const isClient = useDemo() || (wallet && wallet.account.toLowerCase() === j.client.toLowerCase());
-  const isPayee = useDemo() || (wallet && wallet.account.toLowerCase() === j.payee.toLowerCase());
+  const me = wallet ? wallet.account : useDemo() ? null : undefined;
+  const isClient = wallet ? same(me, j.client) : useDemo() && same(CFG.demo.client, j.client);
+  const isPayee = wallet ? same(me, j.payee) : useDemo() && same(CFG.demo.freelancer, j.payee);
+  const open = ["Funded", "ProofSubmitted"].includes(j.status);
+  const payeeHint =
+    j.status === "Funded" && !isPayee
+      ? `<div class="callout">📬 <b>Are you the one getting paid?</b> Only the payee wallet ${addrLink(j.payee)} can submit proof. ${wallet ? "You're connected with a different wallet. Switch accounts in your wallet app." : `<button class="small" id="payeeConnectBtn">Connect wallet</button>`}</div>`
+      : "";
   const b = j.brief;
   el.innerHTML = `
     <div class="row between"><h2>Job #${esc(j.jobId)} · ${esc(j.amount)} tUSD8</h2><span class="status s-${esc(j.status)}">${esc(label(j))}</span></div>
@@ -282,10 +494,15 @@ function renderJob(j) {
     ${live ? `<div class="verdict"><span class="spinner"></span> ${esc(j.agentNote || "AI agent is fetching the proof and checking it against the brief…")}</div>` : ""}
     ${r ? verdictCard(j, r) : ""}
     ${j.agentState === "error" ? `<div class="warn">Agent error: ${esc(j.agentNote)} <button class="ghost small" id="retryBtn">Retry verification</button></div>` : ""}
+    ${open ? `<div class="share"><div><b>Share this job</b> <span class="muted">· send it to the person you're paying, so they can paste their proof link.</span></div><div class="row gap"><input type="text" readonly id="shareUrl" value="${esc(shareUrl(j.jobId))}" style="flex:1;min-width:0"/><button class="ghost" id="copyShareBtn">Copy link</button>${navigator.share ? `<button class="ghost" id="nativeShareBtn">Share</button>` : ""}</div></div>` : ""}
+    ${payeeHint}
     ${j.status === "Funded" && isPayee ? `<h3>Deliver: paste your public proof link</h3><div class="row gap"><input type="text" id="proofUrl" placeholder="https://x.com/you/status/…" style="flex:1"/><button id="proofBtn" class="blue">Submit proof</button></div>${j.rejections ? `<div class="warn">Previous proof was rejected (${j.rejections}/3). Fix it and resubmit before the deadline.</div>` : ""}` : ""}
     ${isClient && ["Funded", "ProofSubmitted"].includes(j.status) ? `<h3>Client controls</h3><div class="row gap"><button class="ghost" id="approveBtn">Approve & pay manually</button>${j.refundable ? `<button class="danger" id="refundBtn">Refund me</button>` : `<span class="muted" style="font-size:13px">Refund unlocks after the deadline${j.status === "ProofSubmitted" ? " + 24h review window" : " or after a rejected proof"}.</span>`}</div>` : ""}
   `;
   const on = (id, fn) => $(id) && ($(id).onclick = () => busy($(id), fn));
+  if ($("#copyShareBtn")) $("#copyShareBtn").onclick = () => copyText(shareUrl(j.jobId), "Job link copied. Send it to the freelancer.");
+  if ($("#nativeShareBtn")) $("#nativeShareBtn").onclick = () => navigator.share({ title: `ProofPay job #${j.jobId}`, text: `You have ${j.amount} tUSD8 waiting on ProofPay. Open the link, connect your wallet and paste your proof link:`, url: shareUrl(j.jobId) }).catch(() => {});
+  on("#payeeConnectBtn", connect);
   on("#proofBtn", async () => {
     const url = $("#proofUrl").value.trim();
     if (!/^https?:\/\//.test(url)) throw new Error("Paste a full public link starting with https://");
@@ -318,6 +535,8 @@ function renderJob(j) {
   });
   if (["Released", "Refunded"].includes(j.status)) renderWallets();
 }
+
+$("#refreshWalletBtn").onclick = () => renderWallets();
 
 function verdictCard(j, r) {
   const d = r.body.decision;

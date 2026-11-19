@@ -6,7 +6,10 @@ import { config, txUrl, addrUrl, type Hex } from "./config.ts";
 import { erc20Abi, escrowAbi } from "./abi.ts";
 import { Signer, escrowAddress, readJob, readParams, publicClient, errMsg } from "./chain.ts";
 import { parseBrief, type Brief } from "./brief.ts";
-import { ContactBook, ContactError } from "./contacts.ts";
+import { Contacts, ContactError, FileContacts, DEMO_OWNER } from "./contacts.ts";
+import { RemoteClient, RemoteContacts, RemoteDocs } from "./remote.ts";
+import { AuthError, NonceGuard, Sessions, login } from "./auth.ts";
+import { JobIndex } from "./job-index.ts";
 import { hashJson } from "./canonical.ts";
 import { makeProvider } from "./llm.ts";
 import { Store } from "./store.ts";
@@ -20,18 +23,53 @@ const agent = new VerifierAgent(store, llm, agentSigner);
 const demoClient = config.demoWallets && config.demoClientKey ? new Signer(config.demoClientKey) : null;
 const demoFreelancer = config.demoWallets && config.demoFreelancerKey ? new Signer(config.demoFreelancerKey) : null;
 
-const book = new ContactBook(config.dataDir);
+const remoteClient = config.storeUrl && config.storeToken ? new RemoteClient(config.storeUrl, config.storeToken) : null;
+const remoteDocs = remoteClient ? new RemoteDocs(remoteClient) : null;
+const book = new Contacts(remoteClient ? new RemoteContacts(remoteClient) : new FileContacts(config.dataDir));
+const sessions = new Sessions(config.sessionSecret);
+const nonces = new NonceGuard();
+const jobIndex = new JobIndex(
+  async () => (await readParams()).jobCount,
+  async (id) => {
+    const j = await readJob(id);
+    return j.status === "None" ? null : { client: j.client, payee: j.payee, briefHash: j.briefHash };
+  },
+  (_id, p) => store.markBriefUsed(p.briefHash),
+);
+
 function demoContact() {
   return demoFreelancer ? { address: demoFreelancer.address, handle: process.env.DEMO_FREELANCER_X ?? "sarah" } : null;
 }
-function contacts() {
-  return book.list(demoContact());
+/** The signed-in wallet (lowercase) from `Authorization: Bearer <session>`, or null. */
+function sessionOwner(req: IncomingMessage): string | null {
+  const h = req.headers.authorization ?? "";
+  return sessions.verify(h.startsWith("Bearer ") ? h.slice(7).trim() : null);
 }
-function contactAction<T>(fn: () => T): T {
+/**
+ * Whose Saved people a request is about. A wallet's list needs a valid signed-in session for that
+ * wallet; the shared demo list is only available while the server runs demo wallets.
+ */
+function contactsOwner(req: IncomingMessage, requested: unknown): string {
+  const want = String(requested ?? "").trim().toLowerCase();
+  const signed = sessionOwner(req);
+  if (want && want !== DEMO_OWNER) {
+    if (!/^0x[0-9a-f]{40}$/.test(want)) throw new HttpError(400, "Unknown owner for Saved people.");
+    if (signed !== want) throw new HttpError(401, "Sign in with your wallet first (a free signature, no gas).");
+    return want;
+  }
+  if (!want && signed) return signed;
+  if (!demoFreelancer) throw new HttpError(401, "Connect and sign in with your wallet to use Saved people.");
+  return DEMO_OWNER;
+}
+async function contactsFor(owner: string) {
+  return book.list(owner, owner === DEMO_OWNER ? demoContact() : null);
+}
+async function contactAction<T>(fn: () => Promise<T>): Promise<T> {
   try {
-    return fn();
+    return await fn();
   } catch (e) {
     if (e instanceof ContactError) throw new HttpError(e.status, e.message);
+    if (e instanceof Error && /^store /.test(e.message)) throw new HttpError(503, "Saved people storage is busy. Please try again in a moment.");
     throw e;
   }
 }
@@ -89,6 +127,7 @@ function registerBrief(brief: Brief): Hex {
 async function jobView(id: bigint) {
   const j = await readJob(id);
   if (j.status === "None") throw new HttpError(404, "Job not found");
+  store.markBriefUsed(j.briefHash);
   const rec = store.job(id);
   const refundable = await publicClient.readContract({ address: escrowAddress(), abi: escrowAbi, functionName: "refundable", args: [id] });
   return {
@@ -115,7 +154,7 @@ async function jobView(id: bigint) {
   };
 }
 
-async function handleApi(req: IncomingMessage, res: ServerResponse, path: string) {
+async function handleApi(req: IncomingMessage, res: ServerResponse, path: string, query: URLSearchParams) {
   const m = req.method ?? "GET";
   if (m !== "GET") rateLimit(req);
 
@@ -136,16 +175,32 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
       escrow: config.escrowAddress || null,
       agent: agentSigner?.address ?? null,
       llm: llm ? `${llm.name}:${llm.model}` : "rules-only",
-      demo: demoClient && demoFreelancer ? { client: demoClient.address, freelancer: demoFreelancer.address } : null,
+      demo: demoClient && demoFreelancer ? { client: demoClient.address, freelancer: demoFreelancer.address, freelancerHandle: demoContact()?.handle } : null,
+      storage: remoteClient ? "durable" : "local",
+      faucet: config.faucetUrl,
       params: params && !params.error ? { ...params, agentReleaseCap: formatUnits(params.agentReleaseCap, 6), maxJobAmount: formatUnits(params.maxJobAmount, 6) } : params,
     });
   }
 
-  if (path === "/api/contacts" && m === "GET") return json(res, 200, contacts());
+  if (path === "/api/auth/login" && m === "POST") {
+    const b = await body(req);
+    try {
+      return json(res, 200, await login(b, { chainId: config.chainId, nonces, sessions }));
+    } catch (e) {
+      if (e instanceof AuthError) throw new HttpError(401, e.message);
+      throw e;
+    }
+  }
+  if (path === "/api/auth/me" && m === "GET") return json(res, 200, { owner: sessionOwner(req) });
+
+  if (path === "/api/contacts" && m === "GET") {
+    const owner = contactsOwner(req, query.get("owner"));
+    return json(res, 200, await contactAction(() => contactsFor(owner)));
+  }
   if (path === "/api/contacts" && m === "POST") {
     const b = await body(req);
-    const saved = contactAction(() => book.upsert(b, !!demoFreelancer));
-    return json(res, 200, saved);
+    const owner = contactsOwner(req, b.owner);
+    return json(res, 200, await contactAction(() => book.upsert(owner, b, !!demoFreelancer)));
   }
   const del = path.match(/^\/api\/contacts\/([^/]+)$/);
   if (del && m === "DELETE") {
@@ -155,7 +210,8 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
     } catch {
       throw new HttpError(400, "Use a name like deestar (letters, numbers or _, up to 30 characters).");
     }
-    contactAction(() => book.remove(raw, !!demoFreelancer));
+    const owner = contactsOwner(req, query.get("owner"));
+    await contactAction(() => book.remove(owner, raw, !!demoFreelancer));
     return json(res, 200, { ok: true });
   }
 
@@ -164,10 +220,15 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
     const text = String(b.text ?? "");
     if (text.trim().length < 8) throw new HttpError(400, "Describe the job in a sentence first.");
     try {
-      const r = await parseBrief(text, contacts(), llm);
+      // A signed-in wallet's own Saved people; otherwise the shared demo list (demo servers only).
+      const o = String(b.owner ?? "").toLowerCase();
+      const owner = o === "none" ? null : o && o !== DEMO_OWNER ? contactsOwner(req, o) : demoFreelancer ? DEMO_OWNER : null;
+      const people = owner ? await contactAction(() => contactsFor(owner)) : {};
+      const r = await parseBrief(text, people, llm);
       registerBrief(r.brief);
       return json(res, 200, { ...r, amountBaseUnits: parseUnits(r.brief.amount, 6).toString() });
     } catch (e) {
+      if (e instanceof HttpError) throw e;
       throw new HttpError(400, (e as Error).message);
     }
   }
@@ -184,6 +245,13 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
 
   if (path === "/api/jobs" && m === "GET") {
     if (!config.escrowAddress) return json(res, 200, []);
+    const w = query.get("wallet");
+    if (w) {
+      if (!isAddress(w, { strict: false })) throw new HttpError(400, "That isn't a wallet address.");
+      const mine = await jobIndex.forWallet(w, 50);
+      const jobs = await Promise.all(mine.map(async ({ id, role }) => ({ ...(await jobView(id).catch(() => null)), role })));
+      return json(res, 200, jobs.filter((j) => j.jobId));
+    }
     const { jobCount } = await readParams();
     const ids: bigint[] = [];
     for (let i = jobCount; i > 0n && ids.length < 25; i--) ids.push(i);
@@ -193,6 +261,14 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
 
   let mm = path.match(/^\/api\/jobs\/(\d+)$/);
   if (mm && m === "GET") return json(res, 200, await jobView(parseJobId(mm[1])));
+
+  // Share link helper: everything the freelancer needs to deliver, in one call.
+  mm = path.match(/^\/api\/jobs\/(\d+)\/share$/);
+  if (mm && m === "GET") {
+    const id = parseJobId(mm[1]);
+    await jobView(id);
+    return json(res, 200, { jobId: id.toString(), path: `/job/${id}` });
+  }
 
   mm = path.match(/^\/api\/jobs\/(\d+)\/receipt$/);
   if (mm && m === "GET") {
@@ -209,7 +285,10 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
     const id = parseJobId(mm[1]);
     const b = await body(req);
     if (mm[2] === "created") {
-      if (b.txHash) store.updateJob(id, { createTx: String(b.txHash).slice(0, 80) });
+      const j = await readJob(id);
+      if (j.status === "None") throw new HttpError(404, "Job not found");
+      store.markBriefUsed(j.briefHash);
+      if (typeof b.txHash === "string" && /^0x[0-9a-fA-F]{64}$/.test(b.txHash)) store.updateJob(id, { createTx: b.txHash });
       return json(res, 200, { ok: true });
     }
     if (mm[2] === "proof" && typeof b.url === "string") {
@@ -251,6 +330,7 @@ async function handleApi(req: IncomingMessage, res: ServerResponse, path: string
       const jobId = sim.result as bigint;
       steps.push({ label: "Lock tUSD8 in escrow", hash: tx.hash, url: txUrl(tx.hash) });
       store.updateJob(jobId, { createTx: tx.hash, agentState: "idle" });
+      store.markBriefUsed(b.briefHash);
       return json(res, 200, { jobId: jobId.toString(), steps });
     }
 
@@ -285,7 +365,7 @@ export const server = createServer(async (req, res) => {
   res.setHeader("x-content-type-options", "nosniff");
   res.setHeader("referrer-policy", "no-referrer");
   try {
-    if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url.pathname);
+    if (url.pathname.startsWith("/api/")) return await handleApi(req, res, url.pathname, url.searchParams);
     const rel = normalize(url.pathname === "/" || /^\/job\/\d+$/.test(url.pathname) ? "/index.html" : url.pathname).replace(/^(\.\.[/\\])+/, "");
     const file = join(PUBLIC_DIR, rel);
     if (!file.startsWith(PUBLIC_DIR) || !existsSync(file)) throw new HttpError(404, "Not found");
@@ -298,10 +378,28 @@ export const server = createServer(async (req, res) => {
   }
 });
 
+async function hydrate() {
+  if (!remoteDocs) return;
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    try {
+      const docs = await remoteDocs.load();
+      store.attachRemote(remoteDocs, docs);
+      console.log(`durable store: loaded ${Object.keys(docs).length} docs`);
+      return;
+    } catch (e) {
+      console.error(`durable store load failed (attempt ${attempt}): ${errMsg(e)}`);
+      await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+  // Still write through, so new jobs are kept even if old docs couldn't be read.
+  store.attachRemote(remoteDocs, {});
+}
+
 if (import.meta.main ?? process.argv[1]?.endsWith("server.ts")) {
+  await hydrate();
   server.listen(config.port, () => {
     console.log(`ProofPay on http://localhost:${config.port}  chain=${config.chainId} escrow=${config.escrowAddress || "(not set)"}`);
-    console.log(`agent=${agentSigner?.address ?? "read-only"} llm=${llm ? llm.model : "rules-only"} demo=${!!(demoClient && demoFreelancer)}`);
+    console.log(`agent=${agentSigner?.address ?? "read-only"} llm=${llm ? llm.model : "rules-only"} demo=${!!(demoClient && demoFreelancer)} storage=${remoteClient ? "d1" : "local"}`);
     if (config.escrowAddress) agent.start();
   });
 }

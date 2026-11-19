@@ -478,7 +478,7 @@ function renderJob(j) {
   const isPayee = wallet ? same(me, j.payee) : useDemo() && same(CFG.demo.freelancer, j.payee);
   const open = ["Funded", "ProofSubmitted"].includes(j.status);
   const payeeHint =
-    j.status === "Funded" && !isPayee
+    j.status === "Funded" && !isPayee && !isClient
       ? `<div class="callout">📬 <b>Are you the one getting paid?</b> Only the payee wallet ${addrLink(j.payee)} can submit proof. ${wallet ? "You're connected with a different wallet. Switch accounts in your wallet app." : `<button class="small" id="payeeConnectBtn">Connect wallet</button>`}</div>`
       : "";
   const b = j.brief;
